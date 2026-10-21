@@ -51,6 +51,11 @@ import de.simon.dankelmann.bluetoothlespam.Enums.AdvertisementSetType
 import de.simon.dankelmann.bluetoothlespam.Enums.stringResId
 import de.simon.dankelmann.bluetoothlespam.R
 
+/** In-memory only: retains Multi Mode choices while the app process is alive. */
+private object MultiModeListSelection {
+    var selectedTypes: Set<AdvertisementSetType> = emptySet()
+}
+
 /** One selectable attack profile card on the Advertisement Collection screen. */
 data class AdvertisementCollectionItem(
     val title: String,
@@ -180,7 +185,11 @@ private fun MultiModePicker(
     onStart: (List<AdvertisementSetType>) -> Unit,
 ) {
     val context = LocalContext.current
-    val selectedTypes = remember { mutableStateMapOf<AdvertisementSetType, Boolean>() }
+    val selectedTypes = remember {
+        mutableStateMapOf<AdvertisementSetType, Boolean>().apply {
+            MultiModeListSelection.selectedTypes.forEach { put(it, true) }
+        }
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -228,13 +237,24 @@ private fun MultiModeDatabaseSection(
             definition.types.distinct().forEach { type ->
                 Row(
                     modifier = Modifier.fillMaxWidth().clickable {
-                        selectedTypes[type] = selectedTypes[type] != true
+                        val selected = selectedTypes[type] != true
+                        selectedTypes[type] = selected
+                        MultiModeListSelection.selectedTypes = selectedTypes
+                            .filterValues { it }
+                            .keys
+                            .toSet()
                     },
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Checkbox(
                         checked = selectedTypes[type] == true,
-                        onCheckedChange = { selectedTypes[type] = it },
+                        onCheckedChange = {
+                            selectedTypes[type] = it
+                            MultiModeListSelection.selectedTypes = selectedTypes
+                                .filterValues { selected -> selected }
+                                .keys
+                                .toSet()
+                        },
                     )
                     Text("${context.getString(type.stringResId())} List")
                 }
