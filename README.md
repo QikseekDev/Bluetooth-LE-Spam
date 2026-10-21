@@ -48,11 +48,13 @@ End of life services are:
   
 You can send BLE advertisements for all services or for selected targets only.
 
-The advertisement screen also provides **Multi Mode**. Tap **Set up Multi Mode** below the
-collection controls, choose one or more lists, and tap **Start Multi Mode**. The app selects one
-item from every chosen list and advertises them concurrently, advancing each list on the
-configured queue interval. The number of simultaneous advertisers is limited by the Android
-device's BLE advertising support.
+The advertisement screen also provides **Multi Mode**. Tap **Set up Multi Mode across device
+lists** in the collection header, choose one or more lists, and tap **Start Multi Mode**. The
+lists can target different platforms—for example, an Android Fast Pair list and an Apple/iOS
+Continuity list can run at the same time. The dialog shows each list's platform and the app
+advertises one item from every chosen list concurrently, advancing each list on the configured
+queue interval. The number of simultaneous advertisers is limited by the Android device's BLE
+advertising support.
 
 </details>
 

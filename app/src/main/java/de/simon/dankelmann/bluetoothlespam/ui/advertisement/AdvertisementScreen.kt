@@ -135,6 +135,7 @@ fun AdvertisementScreen(
             queueMode = queueMode,
             onPlayClicked = onPlayClicked,
             onQueueModeSelected = onQueueModeSelected,
+            onMultiModeClicked = { showMultiModeDialog = true },
         )
 
         if (isLoadingSets) {
@@ -147,16 +148,6 @@ fun AdvertisementScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                item(key = "multi-mode-action-$revision") {
-                    OutlinedButton(
-                        onClick = { showMultiModeDialog = true },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !isAdvertising,
-                    ) {
-                        Icon(imageVector = Icons.Filled.Layers, contentDescription = null)
-                        Text("  Set up Multi Mode")
-                    }
-                }
                 advertisementSetLists.forEachIndexed { groupIndex, list ->
                     // Keys include `revision`: `set`/`list` are plain mutated objects (not Compose
                     // State), and LazyColumn gives each item its own recomposition scope that a
@@ -229,6 +220,7 @@ private fun HeaderSection(
     queueMode: AdvertisementQueueMode,
     onPlayClicked: () -> Unit,
     onQueueModeSelected: (AdvertisementQueueMode) -> Unit,
+    onMultiModeClicked: () -> Unit,
 ) {
     val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.advertisingdevices))
     val progress by animateLottieCompositionAsState(
@@ -260,6 +252,17 @@ private fun HeaderSection(
             PlaceholderBox(modifier = Modifier.padding(top = 4.dp))
         } else {
             Text(text = collectionHint, style = MaterialTheme.typography.bodySmall)
+        }
+
+        OutlinedButton(
+            onClick = onMultiModeClicked,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+            enabled = !isAdvertising,
+        ) {
+            Icon(imageVector = Icons.Filled.Layers, contentDescription = null)
+            Text("  Set up Multi Mode across device lists")
         }
 
         Row(
@@ -350,6 +353,7 @@ private fun MultiModeDialog(
             Column {
                 Text("Choose the lists to advertise at the same time. All selected items in each list will be included.")
                 lists.forEachIndexed { index, list ->
+                    val targets = list.advertisementSets.map { it.target }.distinct()
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -360,7 +364,23 @@ private fun MultiModeDialog(
                             checked = selectedLists[index] == true,
                             onCheckedChange = { selectedLists[index] = it },
                         )
-                        Text(list.title)
+                        Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                            Text(list.title)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                targets.forEach { target ->
+                                    Icon(
+                                        painter = painterResource(target.getDrawableId()),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                    Text(
+                                        text = target.displayName(),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        modifier = Modifier.padding(start = 4.dp, end = 8.dp),
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -373,6 +393,16 @@ private fun MultiModeDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
+}
+
+private fun AdvertisementTarget.displayName(): String = when (this) {
+    AdvertisementTarget.ADVERTISEMENT_TARGET_ANDROID -> "Android"
+    AdvertisementTarget.ADVERTISEMENT_TARGET_IOS -> "Apple / iOS"
+    AdvertisementTarget.ADVERTISEMENT_TARGET_WINDOWS -> "Windows"
+    AdvertisementTarget.ADVERTISEMENT_TARGET_SAMSUNG -> "Samsung"
+    AdvertisementTarget.ADVERTISEMENT_TARGET_LOVESPOUSE -> "Lovespouse"
+    AdvertisementTarget.ADVERTISEMENT_TARGET_KITCHEN_SINK -> "Mixed"
+    AdvertisementTarget.ADVERTISEMENT_TARGET_UNDEFINED -> "Other"
 }
 
 /** Small muted placeholder for a not-yet-available value, standing in for a bare "-" (plan feedback). */
