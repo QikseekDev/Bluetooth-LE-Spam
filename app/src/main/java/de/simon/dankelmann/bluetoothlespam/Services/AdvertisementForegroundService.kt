@@ -64,7 +64,9 @@ class AdvertisementForegroundService: IAdvertisementServiceCallback, IAdvertisem
 
         // Setup Callbacks
         val app = applicationContext as BleSpamApplication
-        app.advertisementService.addAdvertisementServiceCallback(this)
+        // Listen through the queue handler so Multi Mode's parallel services update the
+        // notification too, rather than only the primary advertiser service.
+        app.queueHandler.addAdvertisementServiceCallback(this)
         app.queueHandler.addAdvertisementQueueHandlerCallback(this)
     }
 
@@ -83,7 +85,7 @@ class AdvertisementForegroundService: IAdvertisementServiceCallback, IAdvertisem
 
     override fun onDestroy() {
         val app = applicationContext as BleSpamApplication
-        app.advertisementService.removeAdvertisementServiceCallback(this)
+        app.queueHandler.removeAdvertisementServiceCallback(this)
         app.queueHandler.removeAdvertisementQueueHandlerCallback(this)
 
         super.onDestroy()

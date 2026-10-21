@@ -51,21 +51,23 @@ fun AdvertisementRoute() {
 
     var advertisementSetLists by remember { mutableStateOf<List<AdvertisementSetList>>(emptyList()) }
     var revision by remember { mutableIntStateOf(0) }
+    val activeAdvertisementSets = remember { mutableSetOf<AdvertisementSet>() }
 
-    fun highlightCurrentAdvertisementSet(currentAdvertisementSet: AdvertisementSet, advertisementState: AdvertisementState) {
+    fun highlightActiveAdvertisementSets() {
         advertisementSetLists.forEach { advertisementList ->
-            advertisementList.currentlyAdvertising = false
             advertisementList.advertisementSets.forEach { advertisementSet ->
-                if (advertisementSet == currentAdvertisementSet) {
-                    advertisementSet.advertisementState = advertisementState
-                    advertisementSet.currentlyAdvertising = true
-                    advertisementList.currentlyAdvertising = true
-                } else {
-                    advertisementSet.currentlyAdvertising = false
-                }
+                advertisementSet.currentlyAdvertising = activeAdvertisementSets.contains(advertisementSet)
             }
+            advertisementList.currentlyAdvertising = advertisementList.advertisementSets.any { it.currentlyAdvertising }
         }
         revision++
+    }
+
+    fun highlightCurrentAdvertisementSet(currentAdvertisementSet: AdvertisementSet, advertisementState: AdvertisementState) {
+        activeAdvertisementSets.clear()
+        activeAdvertisementSets.add(currentAdvertisementSet)
+        currentAdvertisementSet.advertisementState = advertisementState
+        highlightActiveAdvertisementSets()
     }
 
     val callback = remember {
@@ -76,23 +78,35 @@ fun AdvertisementRoute() {
                     viewModel.target.value = advertisementSet.target
                     viewModel.advertisementSetTitle.value = advertisementSet.title
                     viewModel.advertisementSetSubTitle.value = advertisementSetSubtitle(advertisementSet)
-                    highlightCurrentAdvertisementSet(advertisementSet, AdvertisementState.ADVERTISEMENT_STATE_STARTED)
+                    if ((context.applicationContext as BleSpamApplication).queueHandler.getAdvertisementQueueMode() == AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI) {
+                        activeAdvertisementSets.add(advertisementSet)
+                        advertisementSet.advertisementState = AdvertisementState.ADVERTISEMENT_STATE_STARTED
+                        highlightActiveAdvertisementSets()
+                    } else {
+                        highlightCurrentAdvertisementSet(advertisementSet, AdvertisementState.ADVERTISEMENT_STATE_STARTED)
+                    }
                 }
             }
 
             override fun onAdvertisementSetStop(advertisementSet: AdvertisementSet?) {
                 Log.d(LOG_TAG, "onAdvertisementSetStop")
+                if (advertisementSet != null && (context.applicationContext as BleSpamApplication).queueHandler.getAdvertisementQueueMode() == AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI) {
+                    activeAdvertisementSets.remove(advertisementSet)
+                    highlightActiveAdvertisementSets()
+                }
             }
 
             override fun onAdvertisementSetSucceeded(advertisementSet: AdvertisementSet?) {
                 if (advertisementSet != null) {
-                    highlightCurrentAdvertisementSet(advertisementSet, AdvertisementState.ADVERTISEMENT_STATE_SUCCEEDED)
+                    advertisementSet.advertisementState = AdvertisementState.ADVERTISEMENT_STATE_SUCCEEDED
+                    highlightActiveAdvertisementSets()
                 }
             }
 
             override fun onAdvertisementSetFailed(advertisementSet: AdvertisementSet?, advertisementError: AdvertisementError) {
                 if (advertisementSet != null) {
-                    highlightCurrentAdvertisementSet(advertisementSet, AdvertisementState.ADVERTISEMENT_STATE_FAILED)
+                    advertisementSet.advertisementState = AdvertisementState.ADVERTISEMENT_STATE_FAILED
+                    highlightActiveAdvertisementSets()
                     Toast.makeText(context, "Advertisement Failed: $advertisementError", Toast.LENGTH_SHORT).show()
                 }
             }
@@ -105,6 +119,8 @@ fun AdvertisementRoute() {
             override fun onQueueHandlerDeactivated() {
                 Log.d(LOG_TAG, "onQueueHandlerDeactivated")
                 viewModel.isAdvertising.value = false
+                activeAdvertisementSets.clear()
+                highlightActiveAdvertisementSets()
             }
 
             override fun onAdvertisementSetCollectionChanged() {

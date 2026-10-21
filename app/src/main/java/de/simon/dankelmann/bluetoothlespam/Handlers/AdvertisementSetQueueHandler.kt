@@ -293,7 +293,9 @@ class AdvertisementSetQueueHandler(
                 override fun onAdvertisementSetStart(advertisementSet: AdvertisementSet?) {
                     forwardMultiStart(advertisementSet)
                 }
-                override fun onAdvertisementSetStop(advertisementSet: AdvertisementSet?) = Unit
+                override fun onAdvertisementSetStop(advertisementSet: AdvertisementSet?) {
+                    forwardMultiStop(advertisementSet)
+                }
                 override fun onAdvertisementSetSucceeded(advertisementSet: AdvertisementSet?) {
                     forwardMultiSuccess(advertisementSet)
                 }
@@ -313,6 +315,12 @@ class AdvertisementSetQueueHandler(
     private fun forwardMultiStart(set: AdvertisementSet?) {
         _advertisementServiceCallbacks.forEach { callback ->
             try { callback.onAdvertisementSetStart(set) } catch (e: Exception) { Log.e(_logTag, "Error in multi start callback", e) }
+        }
+    }
+
+    private fun forwardMultiStop(set: AdvertisementSet?) {
+        _advertisementServiceCallbacks.forEach { callback ->
+            try { callback.onAdvertisementSetStop(set) } catch (e: Exception) { Log.e(_logTag, "Error in multi stop callback", e) }
         }
     }
 
