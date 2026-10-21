@@ -34,6 +34,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -98,6 +99,7 @@ fun AdvertisementScreen(
     revision: Int,
     onPlayClicked: () -> Unit,
     onQueueModeSelected: (AdvertisementQueueMode) -> Unit,
+    onMultiModeStart: (Set<Int>) -> Unit,
     onSetRowClicked: (groupIndex: Int, childIndex: Int, AdvertisementSet) -> Unit,
     onSetCheckedChanged: (AdvertisementSet, Boolean) -> Unit,
     onGroupCheckedChanged: (AdvertisementSetList, Boolean) -> Unit,
@@ -110,6 +112,7 @@ fun AdvertisementScreen(
         }
     }
     var editingSwiftPairSet by remember { mutableStateOf<AdvertisementSet?>(null) }
+    var showMultiModeDialog by remember { mutableStateOf(false) }
 
     // Surface (not a plain Column) so every Text/Icon below that doesn't set an explicit color
     // gets a real LocalContentColor instead of falling back to black -- MainActivity's root is a
@@ -144,6 +147,16 @@ fun AdvertisementScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
+                item(key = "multi-mode-action-$revision") {
+                    OutlinedButton(
+                        onClick = { showMultiModeDialog = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isAdvertising,
+                    ) {
+                        Icon(imageVector = Icons.Filled.Layers, contentDescription = null)
+                        Text("  Set up Multi Mode")
+                    }
+                }
                 advertisementSetLists.forEachIndexed { groupIndex, list ->
                     // Keys include `revision`: `set`/`list` are plain mutated objects (not Compose
                     // State), and LazyColumn gives each item its own recomposition scope that a
@@ -189,6 +202,17 @@ fun AdvertisementScreen(
                 editingSwiftPairSet = null
             },
             onDismiss = { editingSwiftPairSet = null },
+        )
+    }
+
+    if (showMultiModeDialog) {
+        MultiModeDialog(
+            lists = advertisementSetLists,
+            onDismiss = { showMultiModeDialog = false },
+            onStart = { selectedLists ->
+                showMultiModeDialog = false
+                onMultiModeStart(selectedLists)
+            },
         )
     }
 }
@@ -268,17 +292,6 @@ private fun HeaderSection(
                         },
                     )
                 }
-                IconButton(onClick = { onQueueModeSelected(AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI) }) {
-                    Icon(
-                        imageVector = Icons.Filled.Layers,
-                        contentDescription = "Multi mode: one item per selected list",
-                        tint = if (queueMode == AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                    )
-                }
             }
 
             FilledIconButton(onClick = onPlayClicked) {
@@ -314,6 +327,52 @@ private fun HeaderSection(
             }
         }
     }
+}
+
+@Composable
+private fun MultiModeDialog(
+    lists: List<AdvertisementSetList>,
+    onDismiss: () -> Unit,
+    onStart: (Set<Int>) -> Unit,
+) {
+    val selectedLists = remember {
+        mutableStateMapOf<Int, Boolean>().apply {
+            lists.forEachIndexed { index, list ->
+                if (list.advertisementSets.any { it.isChecked }) put(index, true)
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Set up Multi Mode") },
+        text = {
+            Column {
+                Text("Choose the lists to advertise at the same time. All selected items in each list will be included.")
+                lists.forEachIndexed { index, list ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selectedLists[index] = selectedLists[index] != true },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(
+                            checked = selectedLists[index] == true,
+                            onCheckedChange = { selectedLists[index] = it },
+                        )
+                        Text(list.title)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onStart(selectedLists.filterValues { it }.keys) },
+                enabled = selectedLists.any { it.value },
+            ) { Text("Start Multi Mode") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 /** Small muted placeholder for a not-yet-available value, standing in for a bare "-" (plan feedback). */
