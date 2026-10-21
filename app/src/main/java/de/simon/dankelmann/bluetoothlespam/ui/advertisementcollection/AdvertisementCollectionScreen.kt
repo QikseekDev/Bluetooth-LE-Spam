@@ -193,7 +193,9 @@ private fun MultiModePicker(
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
         )
-        builtInCollectionDefinitions.forEach { definition ->
+        builtInCollectionDefinitions
+            .filterNot { it.title == "Kitchen Sink Collection" }
+            .forEach { definition ->
             MultiModeDatabaseSection(definition, selectedTypes, context)
         }
         Row(
