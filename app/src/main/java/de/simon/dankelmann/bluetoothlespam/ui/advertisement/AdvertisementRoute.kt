@@ -191,7 +191,6 @@ fun AdvertisementRoute() {
         revision = revision,
         onPlayClicked = { onPlayButtonClicked(context, viewModel) },
         onQueueModeSelected = { mode -> setAdvertisementQueueMode(context, viewModel, mode) },
-        onMultiModeStart = { selectedLists -> startMultiMode(context, viewModel, selectedLists, advertisementSetLists) },
         onSetRowClicked = { groupIndex, childIndex, set ->
             (context.applicationContext as BleSpamApplication).queueHandler.setSelectedAdvertisementSet(groupIndex, childIndex)
             highlightCurrentAdvertisementSet(set, AdvertisementState.ADVERTISEMENT_STATE_UNDEFINED)
@@ -226,22 +225,6 @@ private fun onPlayButtonClicked(context: Context, viewModel: AdvertisementViewMo
 private fun setAdvertisementQueueMode(context: Context, viewModel: AdvertisementViewModel, mode: AdvertisementQueueMode) {
     (context.applicationContext as BleSpamApplication).queueHandler.setAdvertisementQueueMode(mode)
     viewModel.advertisementQueueMode.value = mode
-}
-
-private fun startMultiMode(
-    context: Context,
-    viewModel: AdvertisementViewModel,
-    selectedLists: Set<Int>,
-    lists: List<AdvertisementSetList>,
-) {
-    lists.forEachIndexed { index, list ->
-        val selected = index in selectedLists
-        list.advertisementSets.forEach { it.isChecked = selected }
-    }
-    val queue = (context.applicationContext as BleSpamApplication).queueHandler
-    queue.setAdvertisementQueueMode(AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI)
-    viewModel.advertisementQueueMode.value = AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI
-    if (viewModel.isAdvertising.value != true) queue.activate(context)
 }
 
 private fun advertisementSetCollectionSubTitle(advertisementSetCollection: AdvertisementSetCollection): String {

@@ -20,7 +20,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
@@ -34,7 +33,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -99,7 +97,6 @@ fun AdvertisementScreen(
     revision: Int,
     onPlayClicked: () -> Unit,
     onQueueModeSelected: (AdvertisementQueueMode) -> Unit,
-    onMultiModeStart: (Set<Int>) -> Unit,
     onSetRowClicked: (groupIndex: Int, childIndex: Int, AdvertisementSet) -> Unit,
     onSetCheckedChanged: (AdvertisementSet, Boolean) -> Unit,
     onGroupCheckedChanged: (AdvertisementSetList, Boolean) -> Unit,
@@ -112,7 +109,6 @@ fun AdvertisementScreen(
         }
     }
     var editingSwiftPairSet by remember { mutableStateOf<AdvertisementSet?>(null) }
-    var showMultiModeDialog by remember { mutableStateOf(false) }
 
     // Surface (not a plain Column) so every Text/Icon below that doesn't set an explicit color
     // gets a real LocalContentColor instead of falling back to black -- MainActivity's root is a
@@ -135,7 +131,6 @@ fun AdvertisementScreen(
             queueMode = queueMode,
             onPlayClicked = onPlayClicked,
             onQueueModeSelected = onQueueModeSelected,
-            onMultiModeClicked = { showMultiModeDialog = true },
         )
 
         if (isLoadingSets) {
@@ -196,16 +191,6 @@ fun AdvertisementScreen(
         )
     }
 
-    if (showMultiModeDialog) {
-        MultiModeDialog(
-            lists = advertisementSetLists,
-            onDismiss = { showMultiModeDialog = false },
-            onStart = { selectedLists ->
-                showMultiModeDialog = false
-                onMultiModeStart(selectedLists)
-            },
-        )
-    }
 }
 
 @Composable
@@ -220,7 +205,6 @@ private fun HeaderSection(
     queueMode: AdvertisementQueueMode,
     onPlayClicked: () -> Unit,
     onQueueModeSelected: (AdvertisementQueueMode) -> Unit,
-    onMultiModeClicked: () -> Unit,
 ) {
     val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.advertisingdevices))
     val progress by animateLottieCompositionAsState(
@@ -252,17 +236,6 @@ private fun HeaderSection(
             PlaceholderBox(modifier = Modifier.padding(top = 4.dp))
         } else {
             Text(text = collectionHint, style = MaterialTheme.typography.bodySmall)
-        }
-
-        OutlinedButton(
-            onClick = onMultiModeClicked,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp),
-            enabled = !isAdvertising,
-        ) {
-            Icon(imageVector = Icons.Filled.Layers, contentDescription = null)
-            Text("  Set up Multi Mode across device lists")
         }
 
         Row(
@@ -330,79 +303,6 @@ private fun HeaderSection(
             }
         }
     }
-}
-
-@Composable
-private fun MultiModeDialog(
-    lists: List<AdvertisementSetList>,
-    onDismiss: () -> Unit,
-    onStart: (Set<Int>) -> Unit,
-) {
-    val selectedLists = remember {
-        mutableStateMapOf<Int, Boolean>().apply {
-            lists.forEachIndexed { index, list ->
-                if (list.advertisementSets.any { it.isChecked }) put(index, true)
-            }
-        }
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Set up Multi Mode") },
-        text = {
-            Column {
-                Text("Choose the lists to advertise at the same time. All selected items in each list will be included.")
-                lists.forEachIndexed { index, list ->
-                    val targets = list.advertisementSets.map { it.target }.distinct()
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { selectedLists[index] = selectedLists[index] != true },
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Checkbox(
-                            checked = selectedLists[index] == true,
-                            onCheckedChange = { selectedLists[index] = it },
-                        )
-                        Column(modifier = Modifier.padding(vertical = 4.dp)) {
-                            Text(list.title)
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                targets.forEach { target ->
-                                    Icon(
-                                        painter = painterResource(target.getDrawableId()),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp),
-                                    )
-                                    Text(
-                                        text = target.displayName(),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        modifier = Modifier.padding(start = 4.dp, end = 8.dp),
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { onStart(selectedLists.filterValues { it }.keys) },
-                enabled = selectedLists.any { it.value },
-            ) { Text("Start Multi Mode") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
-}
-
-private fun AdvertisementTarget.displayName(): String = when (this) {
-    AdvertisementTarget.ADVERTISEMENT_TARGET_ANDROID -> "Android"
-    AdvertisementTarget.ADVERTISEMENT_TARGET_IOS -> "Apple / iOS"
-    AdvertisementTarget.ADVERTISEMENT_TARGET_WINDOWS -> "Windows"
-    AdvertisementTarget.ADVERTISEMENT_TARGET_SAMSUNG -> "Samsung"
-    AdvertisementTarget.ADVERTISEMENT_TARGET_LOVESPOUSE -> "Lovespouse"
-    AdvertisementTarget.ADVERTISEMENT_TARGET_KITCHEN_SINK -> "Mixed"
-    AdvertisementTarget.ADVERTISEMENT_TARGET_UNDEFINED -> "Other"
 }
 
 /** Small muted placeholder for a not-yet-available value, standing in for a bare "-" (plan feedback). */

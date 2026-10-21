@@ -52,6 +52,8 @@ fun AdvertisementCollectionRoute(
         },
         onAddClicked = onCreateCustomGroup,
         onMultiModeStart = { types ->
+            val queue = (context.applicationContext as BleSpamApplication).queueHandler
+            queue.setAdvertisementQueueMode(AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI)
             navigateToAdvertisementWithType(context, types, "Multi Mode", onNavigateToAdvertisement)
         },
     )
