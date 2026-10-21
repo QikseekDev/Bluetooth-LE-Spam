@@ -135,7 +135,17 @@ fun MultiModeSetupScreen(
     onBack: () -> Unit,
     onStart: (List<AdvertisementSetType>) -> Unit,
 ) {
-    var showTutorial by remember { mutableStateOf(true) }
+    val context = LocalContext.current
+    val tutorialPreferences = remember {
+        context.getSharedPreferences("multi_mode_tutorial", android.content.Context.MODE_PRIVATE)
+    }
+    var showTutorial by remember {
+        mutableStateOf(!tutorialPreferences.getBoolean("explained_v1", false))
+    }
+    fun dismissTutorial() {
+        tutorialPreferences.edit().putBoolean("explained_v1", true).apply()
+        showTutorial = false
+    }
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background,
@@ -145,14 +155,20 @@ fun MultiModeSetupScreen(
     }
     if (showTutorial) {
         AlertDialog(
-            onDismissRequest = { showTutorial = false },
+            onDismissRequest = ::dismissTutorial,
             title = { Text("Multi Mode") },
-            text = { Text("Choose lists from different databases—for example Android Fast Pair and Apple/iOS Continuity. Multi Mode advertises one item from each selected list at the same time.") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Advertise across platforms at the same time. For example, run an Android Fast Pair list alongside an Apple/iOS Continuity list.")
+                    Text("How it works: expand a database and check the specific device lists you want. Multi Mode runs one item from every checked list concurrently; each list cycles through its items independently.")
+                    Text("Tap Start Multi Mode when ready. The number of lists that can actually advertise simultaneously depends on your phone’s Bluetooth hardware. Stop advertising with the pause button.")
+                }
+            },
             confirmButton = {
-                Button(onClick = { showTutorial = false }) { Text("Choose Lists") }
+                Button(onClick = ::dismissTutorial) { Text("Choose Lists") }
             },
             dismissButton = {
-                TextButton(onClick = { showTutorial = false }) { Text("Skip") }
+                TextButton(onClick = ::dismissTutorial) { Text("Skip") }
             },
         )
     }
