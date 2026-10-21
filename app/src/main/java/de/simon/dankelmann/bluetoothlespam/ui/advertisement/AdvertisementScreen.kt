@@ -216,7 +216,7 @@ private fun HeaderSection(
     Column(modifier = Modifier.padding(16.dp)) {
         if (isAdvertising) {
             StatusBadge(
-                label = "Advertising",
+                label = if (queueMode == AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI) "Multi Mode" else "Advertising",
                 tone = StatusTone.WARNING,
                 modifier = Modifier.padding(bottom = 8.dp),
             )

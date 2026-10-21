@@ -18,6 +18,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import de.simon.dankelmann.bluetoothlespam.BleSpamApplication
 import de.simon.dankelmann.bluetoothlespam.Enums.AdvertisementError
+import de.simon.dankelmann.bluetoothlespam.Enums.AdvertisementQueueMode
 import de.simon.dankelmann.bluetoothlespam.Enums.AdvertisementState
 import de.simon.dankelmann.bluetoothlespam.Enums.getDrawableId
 import de.simon.dankelmann.bluetoothlespam.Enums.stringResId
@@ -128,14 +129,20 @@ class AdvertisementForegroundService: IAdvertisementServiceCallback, IAdvertisem
         }
 
         // Views for Custom Layout
+        val isMultiMode = app.queueHandler.getAdvertisementQueueMode() == AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI
         notificationView.setTextViewText(
             R.id.advertisementForegroundServiceNotificationTitleTextView,
-            advertisementSet?.title ?: ""
+            if (isMultiMode) "Multi Mode" else advertisementSet?.title.orEmpty()
         )
-        advertisementSet?.type?.stringResId()?.let { resId ->
+        if (!isMultiMode) advertisementSet?.type?.stringResId()?.let { resId ->
             notificationView.setTextViewText(
                 R.id.advertisementForegroundServiceNotificationSubTitleTextView,
                 getString(resId)
+            )
+        } else {
+            notificationView.setTextViewText(
+                R.id.advertisementForegroundServiceNotificationSubTitleTextView,
+                "Advertising selected lists"
             )
         }
         notificationView.setImageViewResource(
@@ -228,7 +235,7 @@ class AdvertisementForegroundService: IAdvertisementServiceCallback, IAdvertisem
         )
 
         val appName = getString(R.string.app_name)
-        val contentText = advertisementSet?.title ?: appName
+        val contentText = if (isMultiMode) "Multi Mode" else advertisementSet?.title ?: appName
 
         return NotificationCompat.Builder(this, _channelId)
             .setContentTitle(appName)
