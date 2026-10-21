@@ -109,7 +109,9 @@ fun AdvertisementRoute(
                 if (advertisementSet != null) {
                     advertisementSet.advertisementState = AdvertisementState.ADVERTISEMENT_STATE_FAILED
                     highlightActiveAdvertisementSets()
-                    Toast.makeText(context, "Advertisement Failed: $advertisementError", Toast.LENGTH_SHORT).show()
+                    if ((context.applicationContext as BleSpamApplication).queueHandler.getAdvertisementQueueMode() != AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI) {
+                        Toast.makeText(context, "Advertisement Failed: $advertisementError", Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
 
