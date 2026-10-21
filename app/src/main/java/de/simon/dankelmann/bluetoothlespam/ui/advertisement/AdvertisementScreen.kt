@@ -94,6 +94,7 @@ fun AdvertisementScreen(
     queueMode: AdvertisementQueueMode,
     isLoadingSets: Boolean,
     advertisementSetLists: List<AdvertisementSetList>,
+    currentlyAdvertisingSets: List<AdvertisementSet>,
     revision: Int,
     onPlayClicked: () -> Unit,
     onEditMultiMode: () -> Unit,
@@ -133,6 +134,7 @@ fun AdvertisementScreen(
             onPlayClicked = onPlayClicked,
             onEditMultiMode = onEditMultiMode,
             onQueueModeSelected = onQueueModeSelected,
+            currentlyAdvertisingSets = currentlyAdvertisingSets,
         )
 
         if (isLoadingSets) {
@@ -208,6 +210,7 @@ private fun HeaderSection(
     onPlayClicked: () -> Unit,
     onEditMultiMode: () -> Unit,
     onQueueModeSelected: (AdvertisementQueueMode) -> Unit,
+    currentlyAdvertisingSets: List<AdvertisementSet>,
 ) {
     val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.advertisingdevices))
     val progress by animateLottieCompositionAsState(
@@ -292,27 +295,60 @@ private fun HeaderSection(
             }
         }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                painter = painterResource(target.getDrawableId()),
-                contentDescription = null,
-                modifier = Modifier.size(32.dp),
-            )
-            Column(modifier = Modifier.padding(start = 12.dp)) {
-                if (currentSetTitle == "-") {
-                    PlaceholderBox()
+        if (queueMode == AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (currentlyAdvertisingSets.isEmpty()) {
+                    Text(
+                        text = if (isAdvertising) "Starting selected lists…" else "No devices currently advertising",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 } else {
-                    Text(text = currentSetTitle, style = MaterialTheme.typography.titleSmall)
+                    currentlyAdvertisingSets.forEach { set ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                painter = painterResource(set.target.getDrawableId()),
+                                contentDescription = null,
+                                modifier = Modifier.size(24.dp),
+                            )
+                            Column(modifier = Modifier.padding(start = 10.dp)) {
+                                Text(text = set.title, style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    text = advertisementSetSubtitle(set),
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                        }
+                    }
                 }
-                if (currentSetSubtitle == "-") {
-                    PlaceholderBox(modifier = Modifier.padding(top = 4.dp))
-                } else {
-                    Text(text = currentSetSubtitle, style = MaterialTheme.typography.bodySmall)
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    painter = painterResource(target.getDrawableId()),
+                    contentDescription = null,
+                    modifier = Modifier.size(32.dp),
+                )
+                Column(modifier = Modifier.padding(start = 12.dp)) {
+                    if (currentSetTitle == "-") {
+                        PlaceholderBox()
+                    } else {
+                        Text(text = currentSetTitle, style = MaterialTheme.typography.titleSmall)
+                    }
+                    if (currentSetSubtitle == "-") {
+                        PlaceholderBox(modifier = Modifier.padding(top = 4.dp))
+                    } else {
+                        Text(text = currentSetSubtitle, style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             }
         }

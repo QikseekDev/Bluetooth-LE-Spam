@@ -190,6 +190,9 @@ fun AdvertisementRoute(
         queueMode = queueMode ?: AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_RANDOM,
         isLoadingSets = isLoadingSets == true,
         advertisementSetLists = advertisementSetLists,
+        currentlyAdvertisingSets = advertisementSetLists
+            .flatMap { it.advertisementSets }
+            .filter { it.currentlyAdvertising },
         revision = revision,
         onPlayClicked = { onPlayButtonClicked(context, viewModel) },
             onEditMultiMode = onEditMultiMode,
