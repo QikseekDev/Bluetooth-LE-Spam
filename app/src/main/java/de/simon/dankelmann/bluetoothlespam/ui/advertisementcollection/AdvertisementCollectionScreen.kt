@@ -62,11 +62,9 @@ fun AdvertisementCollectionScreen(
     premadeItems: List<AdvertisementCollectionItem>,
     customItems: List<AdvertisementCollectionItem>,
     onAddClicked: () -> Unit,
-    onMultiModeStart: (List<AdvertisementSetType>) -> Unit,
+    onMultiModeClicked: () -> Unit,
 ) {
     var customExpanded by remember { mutableStateOf(true) }
-    var showTutorial by remember { mutableStateOf(false) }
-    var showPicker by remember { mutableStateOf(false) }
 
     Scaffold(
         floatingActionButton = {
@@ -99,62 +97,53 @@ fun AdvertisementCollectionScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (showPicker) {
-                item {
-                    MultiModePicker(
-                        onBack = { showPicker = false },
-                        onStart = { types ->
-                            showPicker = false
-                            onMultiModeStart(types)
-                        },
-                    )
-                }
-            } else {
-                item {
-                    AdvertisementCollectionCard(
-                        AdvertisementCollectionItem(
-                            title = "Multi Mode",
-                            targetLabel = "Combine Android, Apple/iOS, Windows and other lists",
-                            distanceLabel = "Select multiple device lists",
-                            iconRes = R.drawable.shuffle,
-                            onClick = { showTutorial = true },
-                        ),
-                    )
-                }
-                items(premadeItems) { item -> AdvertisementCollectionCard(item) }
+            item {
+                AdvertisementCollectionCard(
+                    AdvertisementCollectionItem(
+                        title = "Multi Mode",
+                        targetLabel = "Combine Android, Apple/iOS, Windows and other lists",
+                        distanceLabel = "Select multiple device lists",
+                        iconRes = R.drawable.shuffle,
+                        onClick = onMultiModeClicked,
+                    ),
+                )
+            }
+            items(premadeItems) { item -> AdvertisementCollectionCard(item) }
 
-                if (customItems.isNotEmpty()) {
-                    item {
-                        CategoryHeaderRow(
-                            title = "Custom Groups",
-                            expanded = customExpanded,
-                            onToggle = { customExpanded = !customExpanded },
-                        )
-                    }
-                    if (customExpanded) {
-                        items(customItems) { item -> AdvertisementCollectionCard(item) }
-                    }
+            if (customItems.isNotEmpty()) {
+                item {
+                    CategoryHeaderRow(
+                        title = "Custom Groups",
+                        expanded = customExpanded,
+                        onToggle = { customExpanded = !customExpanded },
+                    )
+                }
+                if (customExpanded) {
+                    items(customItems) { item -> AdvertisementCollectionCard(item) }
                 }
             }
         }
     }
 
+}
+
+@Composable
+fun MultiModeSetupScreen(
+    onBack: () -> Unit,
+    onStart: (List<AdvertisementSetType>) -> Unit,
+) {
+    var showTutorial by remember { mutableStateOf(true) }
+    MultiModePicker(onBack = onBack, onStart = onStart)
     if (showTutorial) {
         AlertDialog(
             onDismissRequest = { showTutorial = false },
             title = { Text("Multi Mode") },
             text = { Text("Choose lists from different databases—for example Android Fast Pair and Apple/iOS Continuity. Multi Mode advertises one item from each selected list at the same time.") },
             confirmButton = {
-                Button(onClick = {
-                    showTutorial = false
-                    showPicker = true
-                }) { Text("Choose Lists") }
+                Button(onClick = { showTutorial = false }) { Text("Choose Lists") }
             },
             dismissButton = {
-                TextButton(onClick = {
-                    showTutorial = false
-                    showPicker = true
-                }) { Text("Skip") }
+                TextButton(onClick = { showTutorial = false }) { Text("Skip") }
             },
         )
     }
@@ -167,7 +156,11 @@ private fun MultiModePicker(
 ) {
     val context = LocalContext.current
     val selectedTypes = remember { mutableStateMapOf<AdvertisementSetType, Boolean>() }
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = SpecterTopAppBarClearance),
+    ) {
         Text("Choose device lists", style = MaterialTheme.typography.headlineSmall)
         Text(
             "Select one or more lists. Lists from different databases can run together.",

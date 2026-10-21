@@ -9,6 +9,7 @@ object SpecterDestinations {
     const val ADVERTISEMENT_COLLECTION = "advertisementCollection"
     const val SPAM_DETECTOR = "spamDetector"
     const val ADVERTISEMENT = "advertisement"
+    const val MULTI_MODE = "multiMode"
     const val PREFERENCES = "preferences"
     const val GROUP_EDITOR = "groupEditor"
     const val MANAGE_QUICK_START = "manageQuickStart"

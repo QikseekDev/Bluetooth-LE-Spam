@@ -58,6 +58,7 @@ import de.simon.dankelmann.bluetoothlespam.Navigation.SpecterDestinations
 import de.simon.dankelmann.bluetoothlespam.Services.BluetoothLeScanForegroundService
 import de.simon.dankelmann.bluetoothlespam.ui.advertisement.AdvertisementRoute
 import de.simon.dankelmann.bluetoothlespam.ui.advertisementcollection.AdvertisementCollectionRoute
+import de.simon.dankelmann.bluetoothlespam.ui.advertisementcollection.AdvertisementMultiModeRoute
 import de.simon.dankelmann.bluetoothlespam.ui.deviceselector.GroupEditorRoute
 import de.simon.dankelmann.bluetoothlespam.ui.preferences.PreferencesRoute
 import de.simon.dankelmann.bluetoothlespam.ui.quickstart.ManageQuickStartRoute
@@ -237,13 +238,24 @@ class MainActivity : AppCompatActivity() {
                                         SpecterDestinations.ADVERTISEMENT_COLLECTION -> AdvertisementCollectionRoute(
                                             onNavigateToAdvertisement = { navController.navigate(SpecterDestinations.ADVERTISEMENT) },
                                             onCreateCustomGroup = { navController.navigate(SpecterDestinations.GROUP_EDITOR) },
+                                            onNavigateToMultiMode = { navController.navigate(SpecterDestinations.MULTI_MODE) },
                                         )
                                         SpecterDestinations.SPAM_DETECTOR -> SpamDetectorRoute()
                                         SpecterDestinations.PREFERENCES -> PreferencesRoute(onTxPowerClicked = { showSetTxPowerDialog() })
                                     }
                                 }
                             }
-                            composable(SpecterDestinations.ADVERTISEMENT) { AdvertisementRoute() }
+                            composable(SpecterDestinations.ADVERTISEMENT) {
+                                AdvertisementRoute(
+                                    onEditMultiMode = { navController.navigate(SpecterDestinations.MULTI_MODE) },
+                                )
+                            }
+                            composable(SpecterDestinations.MULTI_MODE) {
+                                AdvertisementMultiModeRoute(
+                                    onBack = { navController.navigateUp() },
+                                    onNavigateToAdvertisement = { navController.navigate(SpecterDestinations.ADVERTISEMENT) },
+                                )
+                            }
                             composable(SpecterDestinations.GROUP_EDITOR) {
                                 GroupEditorRoute(onSaved = { navController.popBackStack() })
                             }
@@ -343,6 +355,7 @@ class MainActivity : AppCompatActivity() {
 
 private val detailRouteTitles = mapOf(
     SpecterDestinations.ADVERTISEMENT to "Advertisement",
+    SpecterDestinations.MULTI_MODE to "Multi Mode",
     SpecterDestinations.GROUP_EDITOR to "Create custom group",
     SpecterDestinations.MANAGE_QUICK_START to "Manage Quick Start",
 )

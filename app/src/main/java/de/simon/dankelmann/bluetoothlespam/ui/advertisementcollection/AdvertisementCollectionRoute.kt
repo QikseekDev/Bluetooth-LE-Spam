@@ -29,6 +29,7 @@ import kotlinx.coroutines.withContext
 fun AdvertisementCollectionRoute(
     onNavigateToAdvertisement: () -> Unit,
     onCreateCustomGroup: () -> Unit,
+    onNavigateToMultiMode: () -> Unit,
 ) {
     val context = LocalContext.current
     var customGroups by remember { mutableStateOf<List<AdvertisementSetCollectionEntity>>(emptyList()) }
@@ -51,9 +52,21 @@ fun AdvertisementCollectionRoute(
             )
         },
         onAddClicked = onCreateCustomGroup,
-        onMultiModeStart = { types ->
-            val queue = (context.applicationContext as BleSpamApplication).queueHandler
-            queue.setAdvertisementQueueMode(AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI)
+        onMultiModeClicked = onNavigateToMultiMode,
+    )
+}
+
+@Composable
+fun AdvertisementMultiModeRoute(
+    onBack: () -> Unit,
+    onNavigateToAdvertisement: () -> Unit,
+) {
+    val context = LocalContext.current
+    MultiModeSetupScreen(
+        onBack = onBack,
+        onStart = { types ->
+            (context.applicationContext as BleSpamApplication).queueHandler
+                .setAdvertisementQueueMode(AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI)
             navigateToAdvertisementWithType(context, types, "Multi Mode", onNavigateToAdvertisement)
         },
     )

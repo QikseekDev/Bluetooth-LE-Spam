@@ -96,6 +96,7 @@ fun AdvertisementScreen(
     advertisementSetLists: List<AdvertisementSetList>,
     revision: Int,
     onPlayClicked: () -> Unit,
+    onEditMultiMode: () -> Unit,
     onQueueModeSelected: (AdvertisementQueueMode) -> Unit,
     onSetRowClicked: (groupIndex: Int, childIndex: Int, AdvertisementSet) -> Unit,
     onSetCheckedChanged: (AdvertisementSet, Boolean) -> Unit,
@@ -130,6 +131,7 @@ fun AdvertisementScreen(
             currentSetSubtitle = currentSetSubtitle,
             queueMode = queueMode,
             onPlayClicked = onPlayClicked,
+            onEditMultiMode = onEditMultiMode,
             onQueueModeSelected = onQueueModeSelected,
         )
 
@@ -204,6 +206,7 @@ private fun HeaderSection(
     currentSetSubtitle: String,
     queueMode: AdvertisementQueueMode,
     onPlayClicked: () -> Unit,
+    onEditMultiMode: () -> Unit,
     onQueueModeSelected: (AdvertisementQueueMode) -> Unit,
 ) {
     val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.advertisingdevices))
@@ -275,6 +278,17 @@ private fun HeaderSection(
                     imageVector = if (isAdvertising) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                     contentDescription = if (isAdvertising) "Stop advertising" else "Start advertising",
                 )
+            }
+            if (queueMode == AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI) {
+                IconButton(
+                    onClick = onEditMultiMode,
+                    enabled = !isAdvertising,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Edit,
+                        contentDescription = "Edit Multi Mode lists",
+                    )
+                }
             }
         }
 

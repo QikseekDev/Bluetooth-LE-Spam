@@ -39,7 +39,9 @@ private const val LOG_TAG = "AdvertisementRoute"
 
 /** Route entry point (plan §6 step 4) — owns the business logic `AdvertisementFragment` used to own. */
 @Composable
-fun AdvertisementRoute() {
+fun AdvertisementRoute(
+    onEditMultiMode: () -> Unit = {},
+) {
     val context = LocalContext.current
     val viewModel: AdvertisementViewModel = viewModel()
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -190,6 +192,7 @@ fun AdvertisementRoute() {
         advertisementSetLists = advertisementSetLists,
         revision = revision,
         onPlayClicked = { onPlayButtonClicked(context, viewModel) },
+            onEditMultiMode = onEditMultiMode,
         onQueueModeSelected = { mode -> setAdvertisementQueueMode(context, viewModel, mode) },
         onSetRowClicked = { groupIndex, childIndex, set ->
             (context.applicationContext as BleSpamApplication).queueHandler.setSelectedAdvertisementSet(groupIndex, childIndex)
