@@ -51,6 +51,9 @@ fun AdvertisementCollectionRoute(
             )
         },
         onAddClicked = onCreateCustomGroup,
+        onMultiModeStart = { types ->
+            navigateToAdvertisementWithType(context, types, "Multi Mode", onNavigateToAdvertisement)
+        },
     )
 }
 

@@ -16,14 +16,19 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -31,11 +36,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import de.simon.dankelmann.bluetoothlespam.ui.theme.FloatingNavBarClearance
 import de.simon.dankelmann.bluetoothlespam.ui.theme.SpecterTopAppBarClearance
+import de.simon.dankelmann.bluetoothlespam.Database.BuiltInCollectionDefinition
+import de.simon.dankelmann.bluetoothlespam.Database.builtInCollectionDefinitions
+import de.simon.dankelmann.bluetoothlespam.Enums.AdvertisementSetType
+import de.simon.dankelmann.bluetoothlespam.Enums.stringResId
+import de.simon.dankelmann.bluetoothlespam.R
 
 /** One selectable attack profile card on the Advertisement Collection screen. */
 data class AdvertisementCollectionItem(
@@ -51,8 +62,11 @@ fun AdvertisementCollectionScreen(
     premadeItems: List<AdvertisementCollectionItem>,
     customItems: List<AdvertisementCollectionItem>,
     onAddClicked: () -> Unit,
+    onMultiModeStart: (List<AdvertisementSetType>) -> Unit,
 ) {
     var customExpanded by remember { mutableStateOf(true) }
+    var showTutorial by remember { mutableStateOf(false) }
+    var showPicker by remember { mutableStateOf(false) }
 
     Scaffold(
         floatingActionButton = {
@@ -85,18 +99,123 @@ fun AdvertisementCollectionScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            items(premadeItems) { item -> AdvertisementCollectionCard(item) }
-
-            if (customItems.isNotEmpty()) {
+            if (showPicker) {
                 item {
-                    CategoryHeaderRow(
-                        title = "Custom Groups",
-                        expanded = customExpanded,
-                        onToggle = { customExpanded = !customExpanded },
+                    MultiModePicker(
+                        onBack = { showPicker = false },
+                        onStart = { types ->
+                            showPicker = false
+                            onMultiModeStart(types)
+                        },
                     )
                 }
-                if (customExpanded) {
-                    items(customItems) { item -> AdvertisementCollectionCard(item) }
+            } else {
+                item {
+                    AdvertisementCollectionCard(
+                        AdvertisementCollectionItem(
+                            title = "Multi Mode",
+                            targetLabel = "Combine Android, Apple/iOS, Windows and other lists",
+                            distanceLabel = "Select multiple device lists",
+                            iconRes = R.drawable.shuffle,
+                            onClick = { showTutorial = true },
+                        ),
+                    )
+                }
+                items(premadeItems) { item -> AdvertisementCollectionCard(item) }
+
+                if (customItems.isNotEmpty()) {
+                    item {
+                        CategoryHeaderRow(
+                            title = "Custom Groups",
+                            expanded = customExpanded,
+                            onToggle = { customExpanded = !customExpanded },
+                        )
+                    }
+                    if (customExpanded) {
+                        items(customItems) { item -> AdvertisementCollectionCard(item) }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showTutorial) {
+        AlertDialog(
+            onDismissRequest = { showTutorial = false },
+            title = { Text("Multi Mode") },
+            text = { Text("Choose lists from different databases—for example Android Fast Pair and Apple/iOS Continuity. Multi Mode advertises one item from each selected list at the same time.") },
+            confirmButton = {
+                Button(onClick = {
+                    showTutorial = false
+                    showPicker = true
+                }) { Text("Choose Lists") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showTutorial = false
+                    showPicker = true
+                }) { Text("Skip") }
+            },
+        )
+    }
+}
+
+@Composable
+private fun MultiModePicker(
+    onBack: () -> Unit,
+    onStart: (List<AdvertisementSetType>) -> Unit,
+) {
+    val context = LocalContext.current
+    val selectedTypes = remember { mutableStateMapOf<AdvertisementSetType, Boolean>() }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text("Choose device lists", style = MaterialTheme.typography.headlineSmall)
+        Text(
+            "Select one or more lists. Lists from different databases can run together.",
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+        )
+        builtInCollectionDefinitions.forEach { definition ->
+            MultiModeDatabaseSection(definition, selectedTypes, context)
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+            horizontalArrangement = Arrangement.End,
+        ) {
+            TextButton(onClick = onBack) { Text("Back") }
+            Button(
+                onClick = { onStart(selectedTypes.filterValues { it }.keys.toList()) },
+                enabled = selectedTypes.any { it.value },
+            ) { Text("Start Multi Mode") }
+        }
+    }
+}
+
+@Composable
+private fun MultiModeDatabaseSection(
+    definition: BuiltInCollectionDefinition,
+    selectedTypes: MutableMap<AdvertisementSetType, Boolean>,
+    context: android.content.Context,
+) {
+    var expanded by remember { mutableStateOf(true) }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        CategoryHeaderRow(
+            title = definition.title.removeSuffix(" Collection"),
+            expanded = expanded,
+            onToggle = { expanded = !expanded },
+        )
+        if (expanded) {
+            definition.types.distinct().forEach { type ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable {
+                        selectedTypes[type] = selectedTypes[type] != true
+                    },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(
+                        checked = selectedTypes[type] == true,
+                        onCheckedChange = { selectedTypes[type] = it },
+                    )
+                    Text("${context.getString(type.stringResId())} List")
                 }
             }
         }
