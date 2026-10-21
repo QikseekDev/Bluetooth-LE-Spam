@@ -304,7 +304,7 @@ class MainActivity : AppCompatActivity() {
     // Called from PreferencesRoute now that TX power moved out of the toolbar menu.
     fun showSetTxPowerDialog() {
         val app = applicationContext as BleSpamApplication
-        val currentTxPowerLevel = app.advertisementService.getTxPowerLevel()
+        val currentTxPowerLevel = app.queueHandler.getTxPowerLevel()
 
         val composeView = ComposeView(this).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
@@ -319,7 +319,7 @@ class MainActivity : AppCompatActivity() {
                     TxPowerSlider(
                         initialLevel = currentTxPowerLevel,
                         onLevelChanged = { newTxPowerLevel ->
-                            app.advertisementService.setTxPowerLevel(newTxPowerLevel)
+                            app.queueHandler.setTxPowerLevel(newTxPowerLevel)
                         },
                     )
                 }

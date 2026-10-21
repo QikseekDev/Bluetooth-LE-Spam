@@ -48,6 +48,12 @@ End of life services are:
   
 You can send BLE advertisements for all services or for selected targets only.
 
+The advertisement screen also provides **Multi Mode** (the stacked-layers button). Check one or
+more lists, select the items you want in each list, and Multi Mode advertises one selected item
+from every checked list concurrently. Each list advances on the configured queue interval; use
+the repeat or shuffle buttons to choose whether each list advances in order or randomly. The
+number of simultaneous advertisers is limited by the Android device's BLE advertising support.
+
 </details>
 
 <details >

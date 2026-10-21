@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
@@ -261,6 +262,17 @@ private fun HeaderSection(
                         imageVector = Icons.Filled.Shuffle,
                         contentDescription = "Random queue mode",
                         tint = if (queueMode == AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_RANDOM) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                }
+                IconButton(onClick = { onQueueModeSelected(AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI) }) {
+                    Icon(
+                        imageVector = Icons.Filled.Layers,
+                        contentDescription = "Multi mode: one item per selected list",
+                        tint = if (queueMode == AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI) {
                             MaterialTheme.colorScheme.primary
                         } else {
                             MaterialTheme.colorScheme.onSurfaceVariant

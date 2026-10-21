@@ -13,7 +13,9 @@ import de.simon.dankelmann.bluetoothlespam.AdvertisementSetGenerators.Continuity
 import de.simon.dankelmann.bluetoothlespam.Enums.AdvertisementError
 import de.simon.dankelmann.bluetoothlespam.Enums.AdvertisementQueueMode
 import de.simon.dankelmann.bluetoothlespam.Enums.AdvertisementSetType
+import de.simon.dankelmann.bluetoothlespam.Enums.TxPowerLevel
 import de.simon.dankelmann.bluetoothlespam.Helpers.QueueHandlerHelpers
+import de.simon.dankelmann.bluetoothlespam.Helpers.BluetoothHelpers
 import de.simon.dankelmann.bluetoothlespam.Interfaces.Callbacks.IAdvertisementServiceCallback
 import de.simon.dankelmann.bluetoothlespam.Interfaces.Callbacks.IAdvertisementSetQueueHandlerCallback
 import de.simon.dankelmann.bluetoothlespam.Interfaces.Services.IAdvertisementService
@@ -45,6 +47,7 @@ class AdvertisementSetQueueHandler(
     private var _advertisementSetCollection: AdvertisementSetCollection =
         AdvertisementSetCollection()
     private var _intervalMillis: Long = QueueHandlerHelpers.getInterval(context)
+    private var _txPowerLevel: TxPowerLevel? = null
 
     // Callbacks to listen to events of the underlying advertisement service
     private var _advertisementServiceCallbacks:MutableList<IAdvertisementServiceCallback> = mutableListOf()
@@ -55,6 +58,9 @@ class AdvertisementSetQueueHandler(
     private var _currentAdvertisementSet: AdvertisementSet? = null
     private var _currentAdvertisementSetListIndex = 0
     private var _currentAdvertisementSetIndex = 0
+    private val _multiAdvertisementServices = mutableListOf<IAdvertisementService>()
+    private val _multiListIndices = mutableMapOf<Int, Int>()
+    private var _multiCycleToken = 0
 
     init {
         _advertisementService.addAdvertisementServiceCallback(this)
@@ -77,6 +83,14 @@ class AdvertisementSetQueueHandler(
             _intervalMillis = milliseconds
         }
     }
+
+    fun setTxPowerLevel(txPowerLevel: TxPowerLevel) {
+        _txPowerLevel = txPowerLevel
+        _advertisementService.setTxPowerLevel(txPowerLevel)
+        _multiAdvertisementServices.forEach { it.setTxPowerLevel(txPowerLevel) }
+    }
+
+    fun getTxPowerLevel(): TxPowerLevel = _txPowerLevel ?: _advertisementService.getTxPowerLevel()
 
     fun setAdvertisementService(advertisementService: IAdvertisementService) {
         _advertisementService.removeAdvertisementServiceCallback(this)
@@ -197,11 +211,18 @@ class AdvertisementSetQueueHandler(
                 Log.e(_logTag, "Failed to call onQueueHandlerActivated: ${e.message}")
             }
         }
-        advertiseNextAdvertisementSet()
+        if (_advertisementQueueMode == AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI) {
+            advertiseNextMultiCycle(context)
+        } else {
+            advertiseNextAdvertisementSet()
+        }
     }
 
     fun deactivate(context: Context, stopService: Boolean = false) {
         _active = false
+        _multiCycleToken++
+        _multiAdvertisementServices.forEach { it.stopAdvertisement() }
+        _multiAdvertisementServices.clear()
 
         _advertisementService.stopAdvertisement()
 
@@ -238,6 +259,72 @@ class AdvertisementSetQueueHandler(
                 Log.d(_logTag, "Skipping unchecked advertisement set: ${nextSet.title}")
                 onAdvertisementSucceeded()
             }
+        }
+    }
+
+    /** Starts one checked item from every checked list at the same time. */
+    private fun advertiseNextMultiCycle(context: Context) {
+        if (!_active) return
+
+        _multiAdvertisementServices.forEach { it.stopAdvertisement() }
+        _multiAdvertisementServices.clear()
+
+        val selectedSets = _advertisementSetCollection.advertisementSetLists.mapIndexedNotNull { listIndex, list ->
+            val checked = list.advertisementSets.filter { it.isChecked }
+            if (checked.isEmpty()) return@mapIndexedNotNull null
+
+            val selectedIndex = if (_advertisementQueueMode == AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_RANDOM) {
+                Random.nextInt(checked.size)
+            } else {
+                val next = _multiListIndices[listIndex] ?: 0
+                _multiListIndices[listIndex] = (next + 1) % checked.size
+                next % checked.size
+            }
+            prepareAdvertisementSet(checked[selectedIndex])
+        }
+
+        if (selectedSets.isEmpty()) return
+
+        val cycleToken = _multiCycleToken
+        selectedSets.forEach { set ->
+            val service = BluetoothHelpers.getAdvertisementService(context)
+            _txPowerLevel?.let { service.setTxPowerLevel(it) }
+            service.addAdvertisementServiceCallback(object : IAdvertisementServiceCallback {
+                override fun onAdvertisementSetStart(advertisementSet: AdvertisementSet?) {
+                    forwardMultiStart(advertisementSet)
+                }
+                override fun onAdvertisementSetStop(advertisementSet: AdvertisementSet?) = Unit
+                override fun onAdvertisementSetSucceeded(advertisementSet: AdvertisementSet?) {
+                    forwardMultiSuccess(advertisementSet)
+                }
+                override fun onAdvertisementSetFailed(advertisementSet: AdvertisementSet?, advertisementError: AdvertisementError) {
+                    forwardMultiFailure(advertisementSet, advertisementError)
+                }
+            })
+            _multiAdvertisementServices.add(service)
+            service.startAdvertisement(set)
+        }
+
+        Handler(Looper.getMainLooper()).postDelayed({
+            if (_active && cycleToken == _multiCycleToken) advertiseNextMultiCycle(context)
+        }, _intervalMillis)
+    }
+
+    private fun forwardMultiStart(set: AdvertisementSet?) {
+        _advertisementServiceCallbacks.forEach { callback ->
+            try { callback.onAdvertisementSetStart(set) } catch (e: Exception) { Log.e(_logTag, "Error in multi start callback", e) }
+        }
+    }
+
+    private fun forwardMultiSuccess(set: AdvertisementSet?) {
+        _advertisementServiceCallbacks.forEach { callback ->
+            try { callback.onAdvertisementSetSucceeded(set) } catch (e: Exception) { Log.e(_logTag, "Error in multi success callback", e) }
+        }
+    }
+
+    private fun forwardMultiFailure(set: AdvertisementSet?, error: AdvertisementError) {
+        _advertisementServiceCallbacks.forEach { callback ->
+            try { callback.onAdvertisementSetFailed(set, error) } catch (e: Exception) { Log.e(_logTag, "Error in multi failure callback", e) }
         }
     }
 
@@ -335,6 +422,8 @@ class AdvertisementSetQueueHandler(
                     // If no checked items, do nothing
                 }
             }
+
+            AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI -> Unit
         }
     }
 
