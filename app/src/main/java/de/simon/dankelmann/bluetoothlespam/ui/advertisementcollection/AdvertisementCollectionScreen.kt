@@ -172,9 +172,6 @@ fun MultiModeSetupScreen(
             confirmButton = {
                 Button(onClick = ::dismissTutorial) { Text("Choose Lists") }
             },
-            dismissButton = {
-                TextButton(onClick = ::dismissTutorial) { Text("Skip") }
-            },
         )
     }
 }
