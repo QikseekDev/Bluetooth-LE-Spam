@@ -24,6 +24,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -133,7 +134,13 @@ fun MultiModeSetupScreen(
     onStart: (List<AdvertisementSetType>) -> Unit,
 ) {
     var showTutorial by remember { mutableStateOf(true) }
-    MultiModePicker(onBack = onBack, onStart = onStart)
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background,
+        contentColor = MaterialTheme.colorScheme.onBackground,
+    ) {
+        MultiModePicker(onBack = onBack, onStart = onStart)
+    }
     if (showTutorial) {
         AlertDialog(
             onDismissRequest = { showTutorial = false },
