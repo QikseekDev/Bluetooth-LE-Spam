@@ -46,6 +46,7 @@ class AdvertisementSetQueueHandler(
     ) {
         var stopHandled = false
         var onStopped: (() -> Unit)? = null
+        var startAttempts = 0
     }
 
     private var _logTag = "AdvertisementSetQueueHandler"
@@ -322,7 +323,7 @@ class AdvertisementSetQueueHandler(
 
         if (selectedSets.isEmpty()) return
 
-        selectedSets.forEach { set ->
+        selectedSets.forEachIndexed { index, set ->
             val service = BluetoothHelpers.getAdvertisementService(context)
             _txPowerLevel?.let { service.setTxPowerLevel(it) }
             lateinit var advertiser: MultiAdvertiser
@@ -338,13 +339,31 @@ class AdvertisementSetQueueHandler(
                     if (advertiser.cycleToken == _multiCycleToken) forwardMultiSuccess(advertisementSet)
                 }
                 override fun onAdvertisementSetFailed(advertisementSet: AdvertisementSet?, advertisementError: AdvertisementError) {
-                    if (advertiser.cycleToken == _multiCycleToken) forwardMultiFailure(advertisementSet, advertisementError)
+                    if (advertiser.cycleToken != _multiCycleToken) return
+
+                    // A phone can reject a burst of parallel starts while it is still
+                    // allocating advertising slots. Keep that item queued and retry it
+                    // instead of dropping it from the cycle.
+                    if (advertisementError == AdvertisementError.ADVERTISE_FAILED_TOO_MANY_ADVERTISERS ||
+                        advertisementError == AdvertisementError.ADVERTISE_FAILED_INTERNAL_ERROR
+                    ) {
+                        scheduleMultiAdvertiserRetry(advertiser, set)
+                    } else {
+                        forwardMultiFailure(advertisementSet, advertisementError)
+                    }
                 }
             }
             advertiser = MultiAdvertiser(service, callback, cycleToken)
             service.addAdvertisementServiceCallback(callback)
             _multiAdvertisementServices.add(advertiser)
-            service.startAdvertisement(set)
+
+            // Stagger requests slightly so slower Bluetooth stacks can allocate each
+            // advertising slot before the next request arrives.
+            _multiHandler.postDelayed({
+                if (advertiser.cycleToken == _multiCycleToken && _active) {
+                    startMultiAdvertiser(advertiser, set)
+                }
+            }, index * MULTI_START_STAGGER_MILLIS)
         }
 
         _multiHandler.postDelayed({
@@ -356,6 +375,35 @@ class AdvertisementSetQueueHandler(
     }
 
     private val _multiHandler = Handler(Looper.getMainLooper())
+
+    private companion object {
+        const val MULTI_START_STAGGER_MILLIS = 50L
+        const val MULTI_RETRY_DELAY_MILLIS = 500L
+        const val MULTI_MAX_START_ATTEMPTS = 5
+    }
+
+    private fun startMultiAdvertiser(
+        advertiser: MultiAdvertiser,
+        set: AdvertisementSet,
+    ) {
+        if (!_active || advertiser.cycleToken != _multiCycleToken || advertiser.stopHandled) return
+        advertiser.startAttempts++
+        advertiser.service.startAdvertisement(set)
+    }
+
+    private fun scheduleMultiAdvertiserRetry(
+        advertiser: MultiAdvertiser,
+        set: AdvertisementSet,
+    ) {
+        if (advertiser.startAttempts >= MULTI_MAX_START_ATTEMPTS) {
+            forwardMultiFailure(set, AdvertisementError.ADVERTISE_FAILED_TOO_MANY_ADVERTISERS)
+            return
+        }
+
+        _multiHandler.postDelayed({
+            startMultiAdvertiser(advertiser, set)
+        }, MULTI_RETRY_DELAY_MILLIS)
+    }
 
     /** Stops the current advertisers and waits for Android's stop callbacks before restarting. */
     private fun stopCurrentMultiAdvertisers(onComplete: (() -> Unit)? = null) {

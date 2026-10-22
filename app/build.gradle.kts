@@ -61,6 +61,10 @@ android {
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
+            all {
+                // Robolectric's bundled Conscrypt native library is unavailable on Linux ARM64.
+                it.systemProperty("robolectric.conscryptMode", "OFF")
+            }
         }
     }
 
