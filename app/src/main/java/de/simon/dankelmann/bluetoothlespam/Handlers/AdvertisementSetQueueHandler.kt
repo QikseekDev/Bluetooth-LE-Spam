@@ -47,6 +47,7 @@ class AdvertisementSetQueueHandler(
         var stopHandled = false
         var onStopped: (() -> Unit)? = null
         var startAttempts = 0
+        var retryScheduled = false
     }
 
     private var _logTag = "AdvertisementSetQueueHandler"
@@ -354,11 +355,9 @@ class AdvertisementSetQueueHandler(
                     if (advertiser.cycleToken != _multiCycleToken) return
 
                     // A phone can reject a burst of parallel starts while it is still
-                    // allocating advertising slots. Keep that item queued and retry it
-                    // instead of dropping it from the cycle.
-                    if (advertisementError == AdvertisementError.ADVERTISE_FAILED_TOO_MANY_ADVERTISERS ||
-                        advertisementError == AdvertisementError.ADVERTISE_FAILED_INTERNAL_ERROR
-                    ) {
+                    // allocating advertising slots. Keep that item queued only for the
+                    // capacity-specific error; other errors are not transient.
+                    if (advertisementError == AdvertisementError.ADVERTISE_FAILED_TOO_MANY_ADVERTISERS) {
                         scheduleMultiAdvertiserRetry(advertiser, set)
                     } else {
                         forwardMultiFailure(advertisementSet, advertisementError)
@@ -410,6 +409,7 @@ class AdvertisementSetQueueHandler(
         set: AdvertisementSet,
     ) {
         if (!_active || advertiser.cycleToken != _multiCycleToken || advertiser.stopHandled) return
+        advertiser.retryScheduled = false
         advertiser.startAttempts++
         advertiser.service.startAdvertisement(set)
     }
@@ -418,11 +418,13 @@ class AdvertisementSetQueueHandler(
         advertiser: MultiAdvertiser,
         set: AdvertisementSet,
     ) {
+        if (advertiser.retryScheduled || advertiser.stopHandled) return
         if (advertiser.startAttempts >= MULTI_MAX_START_ATTEMPTS) {
             forwardMultiFailure(set, AdvertisementError.ADVERTISE_FAILED_TOO_MANY_ADVERTISERS)
             return
         }
 
+        advertiser.retryScheduled = true
         _multiHandler.postDelayed({
             startMultiAdvertiser(advertiser, set)
         }, MULTI_RETRY_DELAY_MILLIS)
