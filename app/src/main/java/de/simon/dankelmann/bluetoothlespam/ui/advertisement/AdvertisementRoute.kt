@@ -9,6 +9,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -53,25 +54,40 @@ fun AdvertisementRoute(
 
     var advertisementSetLists by remember { mutableStateOf<List<AdvertisementSetList>>(emptyList()) }
     var revision by remember { mutableIntStateOf(0) }
+    val advertisementStatusRevisions = remember { mutableStateMapOf<Int, Int>() }
+    val lastAdvertisementStatuses = remember { mutableMapOf<Int, String>() }
     val activeAdvertisementSets = remember { mutableSetOf<AdvertisementSet>() }
     val pendingMultiAdvertisementSets = remember { mutableSetOf<AdvertisementSet>() }
     val awaitingMultiCycleStart = remember { booleanArrayOf(false) }
 
-    fun highlightActiveAdvertisementSets() {
-        advertisementSetLists.forEach { advertisementList ->
-            advertisementList.advertisementSets.forEach { advertisementSet ->
-                advertisementSet.currentlyAdvertising = activeAdvertisementSets.contains(advertisementSet)
+    fun refreshAdvertisementStatuses(changedSets: Set<AdvertisementSet>) {
+        if (changedSets.isEmpty()) return
+
+        changedSets.forEach { advertisementSet ->
+            advertisementSet.currentlyAdvertising = activeAdvertisementSets.contains(advertisementSet)
+            val status = "${advertisementSet.currentlyAdvertising}:${advertisementSet.advertisementState}"
+            if (lastAdvertisementStatuses[advertisementSet.id] != status) {
+                lastAdvertisementStatuses[advertisementSet.id] = status
+                advertisementStatusRevisions[advertisementSet.id] =
+                    (advertisementStatusRevisions[advertisementSet.id] ?: 0) + 1
             }
-            advertisementList.currentlyAdvertising = advertisementList.advertisementSets.any { it.currentlyAdvertising }
         }
-        revision++
+
+        // Avoid scanning every device row on every Bluetooth callback. Only groups containing
+        // an affected row need their aggregate advertising indicator recalculated.
+        advertisementSetLists.forEach { advertisementList ->
+            if (advertisementList.advertisementSets.any(changedSets::contains)) {
+                advertisementList.currentlyAdvertising = advertisementList.advertisementSets.any { it.currentlyAdvertising }
+            }
+        }
     }
 
     fun highlightCurrentAdvertisementSet(currentAdvertisementSet: AdvertisementSet, advertisementState: AdvertisementState) {
+        val previouslyActive = activeAdvertisementSets.toSet()
         activeAdvertisementSets.clear()
         activeAdvertisementSets.add(currentAdvertisementSet)
         currentAdvertisementSet.advertisementState = advertisementState
-        highlightActiveAdvertisementSets()
+        refreshAdvertisementStatuses(previouslyActive + currentAdvertisementSet)
     }
 
     val callback = remember {
@@ -89,7 +105,7 @@ fun AdvertisementRoute(
                             activeAdvertisementSets.add(advertisementSet)
                         }
                         advertisementSet.advertisementState = AdvertisementState.ADVERTISEMENT_STATE_STARTED
-                        highlightActiveAdvertisementSets()
+                        refreshAdvertisementStatuses(setOf(advertisementSet))
                     } else {
                         highlightCurrentAdvertisementSet(advertisementSet, AdvertisementState.ADVERTISEMENT_STATE_STARTED)
                     }
@@ -106,14 +122,14 @@ fun AdvertisementRoute(
             override fun onAdvertisementSetSucceeded(advertisementSet: AdvertisementSet?) {
                 if (advertisementSet != null) {
                     advertisementSet.advertisementState = AdvertisementState.ADVERTISEMENT_STATE_SUCCEEDED
-                    highlightActiveAdvertisementSets()
+                    refreshAdvertisementStatuses(setOf(advertisementSet))
                 }
             }
 
             override fun onAdvertisementSetFailed(advertisementSet: AdvertisementSet?, advertisementError: AdvertisementError) {
                 if (advertisementSet != null) {
                     advertisementSet.advertisementState = AdvertisementState.ADVERTISEMENT_STATE_FAILED
-                    highlightActiveAdvertisementSets()
+                    refreshAdvertisementStatuses(setOf(advertisementSet))
                     if ((context.applicationContext as BleSpamApplication).queueHandler.getAdvertisementQueueMode() != AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI) {
                         Toast.makeText(context, "Advertisement Failed: $advertisementError", Toast.LENGTH_SHORT).show()
                     }
@@ -130,8 +146,9 @@ fun AdvertisementRoute(
                 viewModel.isAdvertising.value = false
                 awaitingMultiCycleStart[0] = false
                 pendingMultiAdvertisementSets.clear()
+                val previouslyActive = activeAdvertisementSets.toSet()
                 activeAdvertisementSets.clear()
-                highlightActiveAdvertisementSets()
+                refreshAdvertisementStatuses(previouslyActive)
             }
 
             override fun onMultiCycleStarted() {
@@ -142,11 +159,13 @@ fun AdvertisementRoute(
 
             override fun onMultiCycleReady() {
                 if (awaitingMultiCycleStart[0]) {
+                    val previouslyActive = activeAdvertisementSets.toSet()
                     activeAdvertisementSets.clear()
                     activeAdvertisementSets.addAll(pendingMultiAdvertisementSets)
+                    val changedSets = previouslyActive + activeAdvertisementSets
                     pendingMultiAdvertisementSets.clear()
                     awaitingMultiCycleStart[0] = false
-                    highlightActiveAdvertisementSets()
+                    refreshAdvertisementStatuses(changedSets)
                 }
             }
 
@@ -158,6 +177,8 @@ fun AdvertisementRoute(
                 viewModel.advertisementSetCollectionSubTitle.value = advertisementSetCollectionSubTitle(collection)
                 viewModel.advertisementSetCollectionHint.value = advertisementSetCollectionHint(collection)
                 advertisementSetLists = collection.advertisementSetLists.toList()
+                advertisementStatusRevisions.clear()
+                lastAdvertisementStatuses.clear()
                 revision++
             }
         }
@@ -218,6 +239,7 @@ fun AdvertisementRoute(
         currentlyAdvertisingSets = advertisementSetLists
             .flatMap { it.advertisementSets }
             .filter { it.currentlyAdvertising },
+        advertisementStatusRevisions = advertisementStatusRevisions,
         revision = revision,
         onPlayClicked = { onPlayButtonClicked(context, viewModel) },
             onEditMultiMode = onEditMultiMode,

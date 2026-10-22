@@ -1,0 +1,24 @@
+=== BASELINE ===
+exit_status: 1
+sha256: 0132010a6aac5fafc043ff9f64b2e90054df20eaad8500672dddce8b86765336
+bytes: 13853
+state: bold styling absent
+=== MODIFIED ===
+172:                        fontWeight = FontWeight.Bold,
+173-                    )
+174-                    Text("How it works: expand a database and check the specific device lists you want. Multi Mode runs one item from every checked list concurrently; each list cycles through its items independently.")
+--
+178:                        fontWeight = FontWeight.Bold,
+179-                    )
+180-                }
+exit_status: 0
+sha256: b70660d940668ea2fd74e48c4d0ffa2de7866491df922e8040032d8ecdf733dc
+bytes: 14103
+changed_symbol: MultiModeSetupScreen tutorial text
+state: first explanation and battery warning bold
+=== ROLLBACK ===
+exit_status: 1
+sha256: 0132010a6aac5fafc043ff9f64b2e90054df20eaad8500672dddce8b86765336
+bytes: 13853
+state: bold styling absent
+hash_matches_original: yes

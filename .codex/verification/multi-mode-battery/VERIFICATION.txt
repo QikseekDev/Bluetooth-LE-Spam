@@ -1,0 +1,21 @@
+=== BASELINE ===
+command: grep -F battery warning BASELINE.kt
+exit_status: 1
+sha256: d4528c21cf39db9ae0ad5377cf8baa09832d8cd16f8bf16144a21201a29f1ba9
+bytes: 13699
+state: warning absent
+=== MODIFIED ===
+command: grep -F battery warning source
+                    Text("Multi Mode can use more Bluetooth and battery power than a single list, so your battery may drain faster while it is running.")
+exit_status: 0
+sha256: 0132010a6aac5fafc043ff9f64b2e90054df20eaad8500672dddce8b86765336
+bytes: 13853
+changed_symbol: MultiModeSetupScreen tutorial text
+state: warning present
+=== ROLLBACK ===
+command: grep -F battery warning ROLLBACK_COPY.kt
+exit_status: 1
+sha256: d4528c21cf39db9ae0ad5377cf8baa09832d8cd16f8bf16144a21201a29f1ba9
+bytes: 13699
+state: warning absent
+hash_matches_original: yes

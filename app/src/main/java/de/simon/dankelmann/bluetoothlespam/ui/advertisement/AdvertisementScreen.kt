@@ -98,6 +98,7 @@ fun AdvertisementScreen(
     isLoadingSets: Boolean,
     advertisementSetLists: List<AdvertisementSetList>,
     currentlyAdvertisingSets: List<AdvertisementSet>,
+    advertisementStatusRevisions: Map<Int, Int> = emptyMap(),
     revision: Int,
     onPlayClicked: () -> Unit,
     onEditMultiMode: () -> Unit,
@@ -151,16 +152,17 @@ fun AdvertisementScreen(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 advertisementSetLists.forEachIndexed { groupIndex, list ->
-                    // Keys include `revision`: `set`/`list` are plain mutated objects (not Compose
-                    // State), and LazyColumn gives each item its own recomposition scope that a
-                    // `revision++` bump alone doesn't invalidate -- only a key change forces
-                    // Compose to dispose+recreate the row and re-read the mutated field. Without
-                    // this, toggling a checkbox silently updates the model but the checkbox glyph
-                    // stays stale until the group is collapsed/expanded.
-                    item(key = "group-$groupIndex-$revision") {
+                    // Keep LazyColumn item identity stable across status updates so an active
+                    // scroll is not interrupted. `revision` still refreshes the row content for
+                    // the plain mutable model objects used by this screen.
+                    item(key = "group-$groupIndex") {
                         GroupHeaderRow(
                             list = list,
                             expanded = expandedGroups[groupIndex] == true,
+                            revision = revision,
+                            statusRevision = list.advertisementSets.maxOfOrNull {
+                                advertisementStatusRevisions[it.id] ?: 0
+                            } ?: 0,
                             onToggleExpanded = {
                                 expandedGroups[groupIndex] = expandedGroups[groupIndex] != true
                             },
@@ -169,10 +171,12 @@ fun AdvertisementScreen(
                     }
 
                     if (expandedGroups[groupIndex] == true) {
-                        items(list.advertisementSets, key = { "set-$groupIndex-${it.id}-$revision" }) { set ->
+                        items(list.advertisementSets, key = { "set-$groupIndex-${it.id}" }) { set ->
                             val childIndex = list.advertisementSets.indexOf(set)
                             SetRow(
                                 set = set,
+                                revision = revision,
+                                statusRevision = advertisementStatusRevisions[set.id] ?: 0,
                                 onClick = { onSetRowClicked(groupIndex, childIndex, set) },
                                 onCheckedChanged = { checked -> onSetCheckedChanged(set, checked) },
                                 showEditButton = allowCustomSwiftPairNames &&
@@ -380,9 +384,14 @@ private fun PlaceholderBox(modifier: Modifier = Modifier) {
 private fun GroupHeaderRow(
     list: AdvertisementSetList,
     expanded: Boolean,
+    revision: Int,
+    statusRevision: Int,
     onToggleExpanded: () -> Unit,
     onGroupCheckedChanged: (Boolean) -> Unit,
 ) {
+    // Read the revision without changing this LazyColumn item's identity. The caller uses it to
+    // invalidate the row when the plain mutable advertisement model changes.
+    val observedRevision = revision + statusRevision
     val rotation by animateFloatAsState(targetValue = if (expanded) 180f else 0f, label = "chevron")
     val checkedCount = list.advertisementSets.count { it.isChecked }
     val checkedState = when {
@@ -423,11 +432,16 @@ private fun GroupHeaderRow(
 @Composable
 private fun SetRow(
     set: AdvertisementSet,
+    revision: Int,
+    statusRevision: Int,
     onClick: () -> Unit,
     onCheckedChanged: (Boolean) -> Unit,
     showEditButton: Boolean,
     onEditClicked: () -> Unit,
 ) {
+    // Read the revision without changing this LazyColumn item's identity. The caller uses it to
+    // invalidate the row when the plain mutable advertisement model changes.
+    val observedRevision = revision + statusRevision
     val extendedColors = LocalExtendedColors.current
     val titleColor = when {
         set.currentlyAdvertising && set.advertisementState == AdvertisementState.ADVERTISEMENT_STATE_SUCCEEDED -> extendedColors.success

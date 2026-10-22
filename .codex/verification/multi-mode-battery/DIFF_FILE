@@ -1,0 +1,10 @@
+--- /data/data/com.termux/files/home/Bluetooth-LE-Spam/.codex/verification/multi-mode-battery/BASELINE.kt	2026-10-22 17:55:57.669883388 +0200
++++ /data/data/com.termux/files/home/Bluetooth-LE-Spam/app/src/main/java/de/simon/dankelmann/bluetoothlespam/ui/advertisementcollection/AdvertisementCollectionScreen.kt	2026-10-22 17:55:57.813883388 +0200
+@@ -169,6 +169,7 @@
+                     Text("Advertise across platforms at the same time. For example, run an Android Fast Pair list alongside an Apple/iOS Continuity list.")
+                     Text("How it works: expand a database and check the specific device lists you want. Multi Mode runs one item from every checked list concurrently; each list cycles through its items independently.")
+                     Text("Tap Start Multi Mode when ready. The number of lists that can actually advertise simultaneously depends on your phone’s Bluetooth hardware. Stop advertising with the pause button.")
++                    Text("Multi Mode can use more Bluetooth and battery power than a single list, so your battery may drain faster while it is running.")
+                 }
+             },
+             confirmButton = {
