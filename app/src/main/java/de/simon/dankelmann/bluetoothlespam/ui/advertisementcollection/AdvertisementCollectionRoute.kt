@@ -65,9 +65,13 @@ fun AdvertisementMultiModeRoute(
     MultiModeSetupScreen(
         onBack = onBack,
         onStart = { types ->
-            (context.applicationContext as BleSpamApplication).queueHandler
-                .setAdvertisementQueueMode(AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI)
-            navigateToAdvertisementWithType(context, types, "Multi Mode", onNavigateToAdvertisement)
+            navigateToAdvertisementWithType(
+                context,
+                types,
+                "Multi Mode",
+                onNavigateToAdvertisement,
+                AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI,
+            )
         },
     )
 }
@@ -86,6 +90,7 @@ private fun launchCustomGroup(context: Context, groupId: Int, onNavigateToAdvert
         Handler(Looper.getMainLooper()).post {
             app.queueHandler.apply {
                 deactivate(context)
+                setAdvertisementQueueMode(AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_RANDOM)
                 setAdvertisementSetCollection(collection)
             }
             onNavigateToAdvertisement()
@@ -133,10 +138,11 @@ private fun buildAdvertisementCollectionItems(
             distanceLabel = meta.distanceLabel,
             iconRes = meta.iconRes,
             onClick = {
-                if (definition.title == "Kitchen Sink Collection") {
-                    (context.applicationContext as BleSpamApplication).queueHandler
-                        .setAdvertisementQueueMode(AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_RANDOM)
-                }
+                // Multi Mode belongs only to the Multi Mode run. Reset it before opening any
+                // normal collection so the screen does not inherit its badge, editor button, or
+                // multi-list status panel.
+                (context.applicationContext as BleSpamApplication).queueHandler
+                    .setAdvertisementQueueMode(AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_RANDOM)
                 navigateWithType(definition.types, definition.title)
             },
         )
@@ -155,6 +161,7 @@ private fun navigateToAdvertisementWithType(
     advertisementSetTypes: List<AdvertisementSetType>,
     advertisementSetCollectionTitle: String,
     onNavigateToAdvertisement: () -> Unit,
+    queueMode: AdvertisementQueueMode = AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_RANDOM,
 ) {
     val app = context.applicationContext as BleSpamApplication
     val advertisementSetCollection =
@@ -163,6 +170,7 @@ private fun navigateToAdvertisementWithType(
 
     app.queueHandler.apply {
         deactivate(context)
+        setAdvertisementQueueMode(queueMode)
         setAdvertisementSetCollection(advertisementSetCollection)
     }
     onNavigateToAdvertisement()

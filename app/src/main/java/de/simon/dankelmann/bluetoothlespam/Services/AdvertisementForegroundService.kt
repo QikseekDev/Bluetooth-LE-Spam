@@ -13,6 +13,8 @@ import android.graphics.Color
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
+import android.os.Handler
+import android.os.Looper
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -37,6 +39,10 @@ class AdvertisementForegroundService: IAdvertisementServiceCallback, IAdvertisem
     private val _channelDescription = "Bluetooth Le Spam Notifications"
     private var _currentAdvertisementSet:AdvertisementSet? = null
     private val _binder: IBinder = LocalBinder()
+    private val _notificationHandler = Handler(Looper.getMainLooper())
+    private val _pendingMultiModeTitles = linkedSetOf<String>()
+    private var _displayedMultiModeSummary = ""
+    private var _multiNotificationUpdateScheduled = false
 
     companion object {
         private const val NOTIFICATION_ID = 1
@@ -130,6 +136,7 @@ class AdvertisementForegroundService: IAdvertisementServiceCallback, IAdvertisem
 
         // Views for Custom Layout
         val isMultiMode = app.queueHandler.getAdvertisementQueueMode() == AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI
+        val multiSummary = _displayedMultiModeSummary.ifBlank { "Advertising selected lists" }
         notificationView.setTextViewText(
             R.id.advertisementForegroundServiceNotificationTitleTextView,
             if (isMultiMode) "Multi Mode" else advertisementSet?.title.orEmpty()
@@ -142,7 +149,7 @@ class AdvertisementForegroundService: IAdvertisementServiceCallback, IAdvertisem
         } else {
             notificationView.setTextViewText(
                 R.id.advertisementForegroundServiceNotificationSubTitleTextView,
-                "Advertising selected lists"
+                multiSummary
             )
         }
         notificationView.setImageViewResource(
@@ -235,7 +242,11 @@ class AdvertisementForegroundService: IAdvertisementServiceCallback, IAdvertisem
         )
 
         val appName = getString(R.string.app_name)
-        val contentText = if (isMultiMode) "Multi Mode" else advertisementSet?.title ?: appName
+        val contentText = if (isMultiMode) {
+            if (_displayedMultiModeSummary.isBlank()) "Multi Mode" else "Multi Mode: $_displayedMultiModeSummary"
+        } else {
+            advertisementSet?.title ?: appName
+        }
 
         return NotificationCompat.Builder(this, _channelId)
             .setContentTitle(appName)
@@ -258,6 +269,41 @@ class AdvertisementForegroundService: IAdvertisementServiceCallback, IAdvertisem
         notificationManager.notify(NOTIFICATION_ID, notification)
     }
 
+    /**
+     * Multi Mode has several advertisers and therefore produces a callback for every list on
+     * every interval. The notification is intentionally a mode/status indicator, not a live log
+     * of each advertiser. Rebuilding its RemoteViews for every callback makes Android repeatedly
+     * rebind the custom layout, which causes the action buttons to flicker or temporarily vanish.
+     */
+    private fun updateNotificationForStateChange(advertisementSet: AdvertisementSet? = _currentAdvertisementSet) {
+        updateNotification(advertisementSet)
+    }
+
+    private fun updateNotificationForAdvertisementEvent(advertisementSet: AdvertisementSet?) {
+        val app = applicationContext as BleSpamApplication
+        if (app.queueHandler.getAdvertisementQueueMode() == AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI) {
+            queueMultiModeSummaryUpdate(advertisementSet)
+        } else {
+            updateNotification(advertisementSet)
+        }
+    }
+
+    /** Coalesces the parallel callbacks into one stable notification refresh. */
+    private fun queueMultiModeSummaryUpdate(advertisementSet: AdvertisementSet?) {
+        advertisementSet?.title?.takeIf { it.isNotBlank() }?.let { _pendingMultiModeTitles.add(it) }
+        if (_multiNotificationUpdateScheduled) return
+
+        _multiNotificationUpdateScheduled = true
+        _notificationHandler.postDelayed({
+            _displayedMultiModeSummary = _pendingMultiModeTitles
+                .joinToString(", ")
+                .take(120)
+            _pendingMultiModeTitles.clear()
+            _multiNotificationUpdateScheduled = false
+            updateNotification(null)
+        }, 250L)
+    }
+
     // Button Handlers
     class ToggleButtonListener : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -276,29 +322,33 @@ class AdvertisementForegroundService: IAdvertisementServiceCallback, IAdvertisem
     // Advertisement Service Callbacks
     override fun onAdvertisementSetStart(advertisementSet: AdvertisementSet?) {
         _currentAdvertisementSet = advertisementSet
-        updateNotification(advertisementSet)
+        updateNotificationForAdvertisementEvent(advertisementSet)
     }
 
     override fun onAdvertisementSetStop(advertisementSet: AdvertisementSet?) {
         _currentAdvertisementSet = advertisementSet
-        updateNotification(advertisementSet)
+        updateNotificationForAdvertisementEvent(advertisementSet)
     }
 
     override fun onAdvertisementSetSucceeded(advertisementSet: AdvertisementSet?) {
         _currentAdvertisementSet = advertisementSet
-        updateNotification(advertisementSet)
+        updateNotificationForAdvertisementEvent(advertisementSet)
     }
 
     override fun onAdvertisementSetFailed(advertisementSet: AdvertisementSet?, advertisementError: AdvertisementError) {
         _currentAdvertisementSet = advertisementSet
-        updateNotification(advertisementSet)
+        updateNotificationForAdvertisementEvent(advertisementSet)
     }
 
     override fun onQueueHandlerActivated() {
-        updateNotification(_currentAdvertisementSet)
+        updateNotificationForStateChange()
     }
 
     override fun onQueueHandlerDeactivated() {
-        updateNotification(_currentAdvertisementSet)
+        _notificationHandler.removeCallbacksAndMessages(null)
+        _pendingMultiModeTitles.clear()
+        _displayedMultiModeSummary = ""
+        _multiNotificationUpdateScheduled = false
+        updateNotificationForStateChange()
     }
 }
