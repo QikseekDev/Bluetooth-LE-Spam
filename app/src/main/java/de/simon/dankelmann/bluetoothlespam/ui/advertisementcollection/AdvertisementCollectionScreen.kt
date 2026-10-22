@@ -43,6 +43,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import de.simon.dankelmann.bluetoothlespam.ui.theme.FloatingNavBarClearance
 import de.simon.dankelmann.bluetoothlespam.ui.theme.SpecterTopAppBarClearance
@@ -166,9 +167,16 @@ fun MultiModeSetupScreen(
             title = { Text("Multi Mode") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Advertise across platforms at the same time. For example, run an Android Fast Pair list alongside an Apple/iOS Continuity list.")
+                    Text(
+                        "Advertise across platforms at the same time. For example, run an Android Fast Pair list alongside an Apple/iOS Continuity list.",
+                        fontWeight = FontWeight.Bold,
+                    )
                     Text("How it works: expand a database and check the specific device lists you want. Multi Mode runs one item from every checked list concurrently; each list cycles through its items independently.")
                     Text("Tap Start Multi Mode when ready. The number of lists that can actually advertise simultaneously depends on your phone’s Bluetooth hardware. Stop advertising with the pause button.")
+                    Text(
+                        "Multi Mode can use more Bluetooth and battery power than a single list, so your battery may drain faster while it is running.",
+                        fontWeight = FontWeight.Bold,
+                    )
                 }
             },
             confirmButton = {
