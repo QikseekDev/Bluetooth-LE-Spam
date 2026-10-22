@@ -95,16 +95,18 @@ fun AdvertisementRoute(
             override fun onAdvertisementSetStart(advertisementSet: AdvertisementSet?) {
                 Log.d(LOG_TAG, "onAdvertisementSetStart ${advertisementSet?.title}")
                 if (advertisementSet != null) {
+                    viewModel.target.value = advertisementSet.target
+                    viewModel.advertisementSetTitle.value = advertisementSet.title
+                    viewModel.advertisementSetSubTitle.value = advertisementSetSubtitle(advertisementSet)
                     if ((context.applicationContext as BleSpamApplication).queueHandler.getAdvertisementQueueMode() == AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI) {
-                        // Multi Mode commits all rows once per cycle. Updating Compose state for
-                        // every advertiser start made large selections recompose repeatedly on
-                        // the main thread and caused visible lag.
-                        pendingMultiAdvertisementSets.add(advertisementSet)
+                        if (awaitingMultiCycleStart[0]) {
+                            pendingMultiAdvertisementSets.add(advertisementSet)
+                        } else {
+                            activeAdvertisementSets.add(advertisementSet)
+                        }
                         advertisementSet.advertisementState = AdvertisementState.ADVERTISEMENT_STATE_STARTED
+                        refreshAdvertisementStatuses(setOf(advertisementSet))
                     } else {
-                        viewModel.target.value = advertisementSet.target
-                        viewModel.advertisementSetTitle.value = advertisementSet.title
-                        viewModel.advertisementSetSubTitle.value = advertisementSetSubtitle(advertisementSet)
                         highlightCurrentAdvertisementSet(advertisementSet, AdvertisementState.ADVERTISEMENT_STATE_STARTED)
                     }
                 }
@@ -119,7 +121,6 @@ fun AdvertisementRoute(
 
             override fun onAdvertisementSetSucceeded(advertisementSet: AdvertisementSet?) {
                 if (advertisementSet != null) {
-                    if ((context.applicationContext as BleSpamApplication).queueHandler.getAdvertisementQueueMode() == AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI) return
                     advertisementSet.advertisementState = AdvertisementState.ADVERTISEMENT_STATE_SUCCEEDED
                     refreshAdvertisementStatuses(setOf(advertisementSet))
                 }
