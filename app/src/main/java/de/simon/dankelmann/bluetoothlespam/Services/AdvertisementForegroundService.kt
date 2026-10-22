@@ -253,6 +253,15 @@ class AdvertisementForegroundService: IAdvertisementServiceCallback, IAdvertisem
             .setContentText(contentText)
             .setSmallIcon(R.drawable.bluetooth)
             .setContentIntent(pendingIntentTargeted)
+            // Keep platform notification actions available when Android collapses or temporarily
+            // drops the custom RemoteViews during a pause/resume update. The same PendingIntents
+            // are also attached to the custom image buttons below.
+            .addAction(
+                toggleImageSrc,
+                if (app.queueHandler.isActive()) "Pause" else "Resume",
+                pendingToggleSwitchIntent,
+            )
+            .addAction(R.drawable.stop, "Stop", pendingStopSwitchIntent)
             .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setChannelId(_channelId)
             .setOngoing(true)
