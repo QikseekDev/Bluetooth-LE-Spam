@@ -13,8 +13,6 @@ import android.graphics.Color
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
-import android.os.Handler
-import android.os.Looper
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -39,10 +37,6 @@ class AdvertisementForegroundService: IAdvertisementServiceCallback, IAdvertisem
     private val _channelDescription = "Bluetooth Le Spam Notifications"
     private var _currentAdvertisementSet:AdvertisementSet? = null
     private val _binder: IBinder = LocalBinder()
-    private val _notificationHandler = Handler(Looper.getMainLooper())
-    private val _pendingMultiModeTitles = linkedSetOf<String>()
-    private var _displayedMultiModeSummary = ""
-    private var _multiNotificationUpdateScheduled = false
 
     companion object {
         private const val NOTIFICATION_ID = 1
@@ -136,7 +130,7 @@ class AdvertisementForegroundService: IAdvertisementServiceCallback, IAdvertisem
 
         // Views for Custom Layout
         val isMultiMode = app.queueHandler.getAdvertisementQueueMode() == AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI
-        val multiSummary = _displayedMultiModeSummary.ifBlank { "Advertising selected lists" }
+        val multiSummary = "Spamming across all selected lists"
         notificationView.setTextViewText(
             R.id.advertisementForegroundServiceNotificationTitleTextView,
             if (isMultiMode) "Multi Mode" else advertisementSet?.title.orEmpty()
@@ -243,7 +237,7 @@ class AdvertisementForegroundService: IAdvertisementServiceCallback, IAdvertisem
 
         val appName = getString(R.string.app_name)
         val contentText = if (isMultiMode) {
-            if (_displayedMultiModeSummary.isBlank()) "Multi Mode" else "Multi Mode: $_displayedMultiModeSummary"
+            "Spamming across all selected lists"
         } else {
             advertisementSet?.title ?: appName
         }
@@ -290,27 +284,9 @@ class AdvertisementForegroundService: IAdvertisementServiceCallback, IAdvertisem
 
     private fun updateNotificationForAdvertisementEvent(advertisementSet: AdvertisementSet?) {
         val app = applicationContext as BleSpamApplication
-        if (app.queueHandler.getAdvertisementQueueMode() == AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI) {
-            queueMultiModeSummaryUpdate(advertisementSet)
-        } else {
+        if (app.queueHandler.getAdvertisementQueueMode() != AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI) {
             updateNotification(advertisementSet)
         }
-    }
-
-    /** Coalesces the parallel callbacks into one stable notification refresh. */
-    private fun queueMultiModeSummaryUpdate(advertisementSet: AdvertisementSet?) {
-        advertisementSet?.title?.takeIf { it.isNotBlank() }?.let { _pendingMultiModeTitles.add(it) }
-        if (_multiNotificationUpdateScheduled) return
-
-        _multiNotificationUpdateScheduled = true
-        _notificationHandler.postDelayed({
-            _displayedMultiModeSummary = _pendingMultiModeTitles
-                .joinToString(", ")
-                .take(120)
-            _pendingMultiModeTitles.clear()
-            _multiNotificationUpdateScheduled = false
-            updateNotification(null)
-        }, 250L)
     }
 
     // Button Handlers
@@ -354,10 +330,6 @@ class AdvertisementForegroundService: IAdvertisementServiceCallback, IAdvertisem
     }
 
     override fun onQueueHandlerDeactivated() {
-        _notificationHandler.removeCallbacksAndMessages(null)
-        _pendingMultiModeTitles.clear()
-        _displayedMultiModeSummary = ""
-        _multiNotificationUpdateScheduled = false
         updateNotificationForStateChange()
     }
 }
