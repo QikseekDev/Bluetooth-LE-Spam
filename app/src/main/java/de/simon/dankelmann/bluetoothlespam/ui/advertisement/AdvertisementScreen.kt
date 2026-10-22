@@ -254,34 +254,34 @@ private fun HeaderSection(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Row {
-                IconButton(
-                    onClick = { onQueueModeSelected(AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_LINEAR) },
-                    enabled = !(isAdvertising && queueMode == AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI),
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Repeat,
-                        contentDescription = "Linear queue mode",
-                        tint = if (queueMode == AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_LINEAR) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                    )
-                }
-                IconButton(
-                    onClick = { onQueueModeSelected(AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_RANDOM) },
-                    enabled = !(isAdvertising && queueMode == AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI),
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Shuffle,
-                        contentDescription = "Random queue mode",
-                        tint = if (queueMode == AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_RANDOM) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                    )
+            if (queueMode != AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI) {
+                Row {
+                    IconButton(
+                        onClick = { onQueueModeSelected(AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_LINEAR) },
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Repeat,
+                            contentDescription = "Linear queue mode",
+                            tint = if (queueMode == AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_LINEAR) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
+                    }
+                    IconButton(
+                        onClick = { onQueueModeSelected(AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_RANDOM) },
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Shuffle,
+                            contentDescription = "Random queue mode",
+                            tint = if (queueMode == AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_RANDOM) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
+                    }
                 }
             }
 
