@@ -39,6 +39,15 @@ class AdvertisementSetQueueHandler(
     adService: IAdvertisementService,
 ) : IAdvertisementServiceCallback {
 
+    private class MultiAdvertiser(
+        val service: IAdvertisementService,
+        val callback: IAdvertisementServiceCallback,
+        val cycleToken: Int,
+    ) {
+        var stopHandled = false
+        var onStopped: (() -> Unit)? = null
+    }
+
     private var _logTag = "AdvertisementSetQueueHandler"
 
     private var _advertisementService: IAdvertisementService = adService
@@ -58,7 +67,7 @@ class AdvertisementSetQueueHandler(
     private var _currentAdvertisementSet: AdvertisementSet? = null
     private var _currentAdvertisementSetListIndex = 0
     private var _currentAdvertisementSetIndex = 0
-    private val _multiAdvertisementServices = mutableListOf<IAdvertisementService>()
+    private val _multiAdvertisementServices = mutableListOf<MultiAdvertiser>()
     private val _multiListIndices = mutableMapOf<Int, Int>()
     private var _multiCycleToken = 0
 
@@ -71,6 +80,15 @@ class AdvertisementSetQueueHandler(
     }
 
     fun setAdvertisementQueueMode(advertisementQueueMode: AdvertisementQueueMode){
+        // A running Multi Mode cycle must finish in Multi Mode. Changing this enum while the
+        // parallel advertisers are alive makes the UI/notification switch to single-queue logic
+        // while the old advertisers continue running.
+        if (_active &&
+            _advertisementQueueMode == AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI &&
+            advertisementQueueMode != AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI
+        ) {
+            return
+        }
         _advertisementQueueMode = advertisementQueueMode
     }
 
@@ -87,7 +105,7 @@ class AdvertisementSetQueueHandler(
     fun setTxPowerLevel(txPowerLevel: TxPowerLevel) {
         _txPowerLevel = txPowerLevel
         _advertisementService.setTxPowerLevel(txPowerLevel)
-        _multiAdvertisementServices.forEach { it.setTxPowerLevel(txPowerLevel) }
+        _multiAdvertisementServices.forEach { it.service.setTxPowerLevel(txPowerLevel) }
     }
 
     fun getTxPowerLevel(): TxPowerLevel = _txPowerLevel ?: _advertisementService.getTxPowerLevel()
@@ -116,6 +134,7 @@ class AdvertisementSetQueueHandler(
         _currentAdvertisementSet= null
         _currentAdvertisementSetListIndex = 0
         _currentAdvertisementSetIndex = 0
+        _multiListIndices.clear()
 
         // Callers must invoke this from the main thread (matches every existing call site) since
         // listeners (e.g. AdvertisementRoute) update Compose/LiveData state directly here.
@@ -221,7 +240,8 @@ class AdvertisementSetQueueHandler(
     fun deactivate(context: Context, stopService: Boolean = false) {
         _active = false
         _multiCycleToken++
-        _multiAdvertisementServices.forEach { it.stopAdvertisement() }
+        _multiHandler.removeCallbacksAndMessages(null)
+        stopCurrentMultiAdvertisers()
         _multiAdvertisementServices.clear()
 
         _advertisementService.stopAdvertisement()
@@ -264,10 +284,21 @@ class AdvertisementSetQueueHandler(
 
     /** Starts one checked item from every checked list at the same time. */
     private fun advertiseNextMultiCycle(context: Context) {
-        if (!_active) return
+        if (!_active || _advertisementQueueMode != AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI) return
 
-        _multiAdvertisementServices.forEach { it.stopAdvertisement() }
-        _multiAdvertisementServices.clear()
+        val cycleToken = ++_multiCycleToken
+        stopCurrentMultiAdvertisers {
+            if (_active &&
+                _advertisementQueueMode == AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI &&
+                cycleToken == _multiCycleToken
+            ) {
+                startMultiCycle(context, cycleToken)
+            }
+        }
+    }
+
+    private fun startMultiCycle(context: Context, cycleToken: Int) {
+        if (!_active || cycleToken != _multiCycleToken) return
 
         val selectedSets = _advertisementSetCollection.advertisementSetLists.mapIndexedNotNull { listIndex, list ->
             val checked = list.advertisementSets.filter { it.isChecked }
@@ -283,33 +314,85 @@ class AdvertisementSetQueueHandler(
             prepareAdvertisementSet(checked[selectedIndex])
         }
 
+        _advertisementQueueHandlerCallbacks.forEach { callback ->
+            try { callback.onMultiCycleStarted() } catch (e: Exception) {
+                Log.e(_logTag, "Failed to call onMultiCycleStarted: ${e.message}")
+            }
+        }
+
         if (selectedSets.isEmpty()) return
 
-        val cycleToken = _multiCycleToken
         selectedSets.forEach { set ->
             val service = BluetoothHelpers.getAdvertisementService(context)
             _txPowerLevel?.let { service.setTxPowerLevel(it) }
-            service.addAdvertisementServiceCallback(object : IAdvertisementServiceCallback {
+            lateinit var advertiser: MultiAdvertiser
+            val callback = object : IAdvertisementServiceCallback {
                 override fun onAdvertisementSetStart(advertisementSet: AdvertisementSet?) {
-                    forwardMultiStart(advertisementSet)
+                    if (advertiser.cycleToken == _multiCycleToken) forwardMultiStart(advertisementSet)
                 }
                 override fun onAdvertisementSetStop(advertisementSet: AdvertisementSet?) {
-                    forwardMultiStop(advertisementSet)
+                    if (advertiser.cycleToken == _multiCycleToken) forwardMultiStop(advertisementSet)
+                    advertiser.onStopped?.invoke()
                 }
                 override fun onAdvertisementSetSucceeded(advertisementSet: AdvertisementSet?) {
-                    forwardMultiSuccess(advertisementSet)
+                    if (advertiser.cycleToken == _multiCycleToken) forwardMultiSuccess(advertisementSet)
                 }
                 override fun onAdvertisementSetFailed(advertisementSet: AdvertisementSet?, advertisementError: AdvertisementError) {
-                    forwardMultiFailure(advertisementSet, advertisementError)
+                    if (advertiser.cycleToken == _multiCycleToken) forwardMultiFailure(advertisementSet, advertisementError)
                 }
-            })
-            _multiAdvertisementServices.add(service)
+            }
+            advertiser = MultiAdvertiser(service, callback, cycleToken)
+            service.addAdvertisementServiceCallback(callback)
+            _multiAdvertisementServices.add(advertiser)
             service.startAdvertisement(set)
         }
 
-        Handler(Looper.getMainLooper()).postDelayed({
-            if (_active && cycleToken == _multiCycleToken) advertiseNextMultiCycle(context)
+        _multiHandler.postDelayed({
+            if (_active &&
+                _advertisementQueueMode == AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI &&
+                cycleToken == _multiCycleToken
+            ) advertiseNextMultiCycle(context)
         }, _intervalMillis)
+    }
+
+    private val _multiHandler = Handler(Looper.getMainLooper())
+
+    /** Stops the current advertisers and waits for Android's stop callbacks before restarting. */
+    private fun stopCurrentMultiAdvertisers(onComplete: (() -> Unit)? = null) {
+        val advertisers = _multiAdvertisementServices.toList()
+        _multiAdvertisementServices.clear()
+        if (advertisers.isEmpty()) {
+            onComplete?.invoke()
+            return
+        }
+
+        var remaining = advertisers.size
+        var completed = false
+        fun completeOne(advertiser: MultiAdvertiser) {
+            if (advertiser.stopHandled) return
+            advertiser.stopHandled = true
+            advertiser.service.removeAdvertisementServiceCallback(advertiser.callback)
+            remaining--
+            if (remaining == 0 && !completed) {
+                completed = true
+                onComplete?.invoke()
+            }
+        }
+
+        advertisers.forEach { advertiser ->
+            advertiser.onStopped = { completeOne(advertiser) }
+            advertiser.service.stopAdvertisement()
+        }
+
+        // Some adapters do not deliver a stop callback when an advertiser failed to start.
+        // Do not block the next cycle forever in that case.
+        _multiHandler.postDelayed({
+            if (!completed) {
+                completed = true
+                advertisers.forEach { completeOne(it) }
+                onComplete?.invoke()
+            }
+        }, 1000L)
     }
 
     private fun forwardMultiStart(set: AdvertisementSet?) {

@@ -255,7 +255,10 @@ private fun HeaderSection(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Row {
-                IconButton(onClick = { onQueueModeSelected(AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_LINEAR) }) {
+                IconButton(
+                    onClick = { onQueueModeSelected(AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_LINEAR) },
+                    enabled = !(isAdvertising && queueMode == AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI),
+                ) {
                     Icon(
                         imageVector = Icons.Filled.Repeat,
                         contentDescription = "Linear queue mode",
@@ -266,7 +269,10 @@ private fun HeaderSection(
                         },
                     )
                 }
-                IconButton(onClick = { onQueueModeSelected(AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_RANDOM) }) {
+                IconButton(
+                    onClick = { onQueueModeSelected(AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_RANDOM) },
+                    enabled = !(isAdvertising && queueMode == AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI),
+                ) {
                     Icon(
                         imageVector = Icons.Filled.Shuffle,
                         contentDescription = "Random queue mode",

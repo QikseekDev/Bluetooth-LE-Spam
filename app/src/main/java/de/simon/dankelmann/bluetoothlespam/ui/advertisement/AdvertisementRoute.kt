@@ -127,6 +127,11 @@ fun AdvertisementRoute(
                 highlightActiveAdvertisementSets()
             }
 
+            override fun onMultiCycleStarted() {
+                activeAdvertisementSets.clear()
+                highlightActiveAdvertisementSets()
+            }
+
             override fun onAdvertisementSetCollectionChanged() {
                 val queue = (context.applicationContext as BleSpamApplication).queueHandler
                 val collection = queue.getAdvertisementSetCollection()
@@ -231,8 +236,12 @@ private fun onPlayButtonClicked(context: Context, viewModel: AdvertisementViewMo
 }
 
 private fun setAdvertisementQueueMode(context: Context, viewModel: AdvertisementViewModel, mode: AdvertisementQueueMode) {
-    (context.applicationContext as BleSpamApplication).queueHandler.setAdvertisementQueueMode(mode)
-    viewModel.advertisementQueueMode.value = mode
+    val queue = (context.applicationContext as BleSpamApplication).queueHandler
+    if (queue.isActive() && queue.getAdvertisementQueueMode() == AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI) {
+        return
+    }
+    queue.setAdvertisementQueueMode(mode)
+    viewModel.advertisementQueueMode.value = queue.getAdvertisementQueueMode()
 }
 
 private fun advertisementSetCollectionSubTitle(advertisementSetCollection: AdvertisementSetCollection): String {

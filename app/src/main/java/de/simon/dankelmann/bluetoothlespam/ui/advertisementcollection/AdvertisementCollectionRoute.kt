@@ -138,11 +138,6 @@ private fun buildAdvertisementCollectionItems(
             distanceLabel = meta.distanceLabel,
             iconRes = meta.iconRes,
             onClick = {
-                // Multi Mode belongs only to the Multi Mode run. Reset it before opening any
-                // normal collection so the screen does not inherit its badge, editor button, or
-                // multi-list status panel.
-                (context.applicationContext as BleSpamApplication).queueHandler
-                    .setAdvertisementQueueMode(AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_RANDOM)
                 navigateWithType(definition.types, definition.title)
             },
         )
