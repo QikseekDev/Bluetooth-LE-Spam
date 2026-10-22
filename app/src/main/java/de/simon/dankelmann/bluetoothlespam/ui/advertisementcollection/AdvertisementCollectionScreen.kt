@@ -26,6 +26,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -54,6 +55,7 @@ import de.simon.dankelmann.bluetoothlespam.R
 /** In-memory only: retains Multi Mode choices while the app process is alive. */
 private object MultiModeListSelection {
     var selectedTypes: Set<AdvertisementSetType> = emptySet()
+    var startSpacingMillis: Int = 0
 }
 
 /** One selectable attack profile card on the Advertisement Collection screen. */
@@ -138,7 +140,7 @@ fun AdvertisementCollectionScreen(
 @Composable
 fun MultiModeSetupScreen(
     onBack: () -> Unit,
-    onStart: (List<AdvertisementSetType>) -> Unit,
+    onStart: (List<AdvertisementSetType>, Long) -> Unit,
 ) {
     val context = LocalContext.current
     val tutorialPreferences = remember {
@@ -179,7 +181,7 @@ fun MultiModeSetupScreen(
 @Composable
 private fun MultiModePicker(
     onBack: () -> Unit,
-    onStart: (List<AdvertisementSetType>) -> Unit,
+    onStart: (List<AdvertisementSetType>, Long) -> Unit,
 ) {
     val context = LocalContext.current
     val selectedTypes = remember {
@@ -187,6 +189,7 @@ private fun MultiModePicker(
             MultiModeListSelection.selectedTypes.forEach { put(it, true) }
         }
     }
+    var startSpacingMillis by remember { mutableStateOf(MultiModeListSelection.startSpacingMillis) }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -199,6 +202,27 @@ private fun MultiModePicker(
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
         )
+        Text(
+            "Start spacing: ${if (startSpacingMillis == 0) "No delay" else "$startSpacingMillis ms"}",
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Text(
+            "Delay between starting each selected list. Lower values bring lists online faster; higher values help slower Bluetooth hardware keep up.",
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        Slider(
+            value = startSpacingMillis.toFloat(),
+            onValueChange = {
+                startSpacingMillis = it.toInt()
+                MultiModeListSelection.startSpacingMillis = startSpacingMillis
+            },
+            valueRange = 0f..500f,
+            steps = 19,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 28.dp),
+        )
         builtInCollectionDefinitions
             .filterNot { it.title == "Kitchen Sink Collection" }
             .forEach { definition ->
@@ -210,7 +234,9 @@ private fun MultiModePicker(
         ) {
             TextButton(onClick = onBack) { Text("Back") }
             Button(
-                onClick = { onStart(selectedTypes.filterValues { it }.keys.toList()) },
+                onClick = {
+                    onStart(selectedTypes.filterValues { it }.keys.toList(), startSpacingMillis.toLong())
+                },
                 enabled = selectedTypes.any { it.value },
             ) { Text("Start Multi Mode") }
         }

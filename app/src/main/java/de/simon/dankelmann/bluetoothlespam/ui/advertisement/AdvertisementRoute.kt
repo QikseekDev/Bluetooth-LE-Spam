@@ -54,6 +54,8 @@ fun AdvertisementRoute(
     var advertisementSetLists by remember { mutableStateOf<List<AdvertisementSetList>>(emptyList()) }
     var revision by remember { mutableIntStateOf(0) }
     val activeAdvertisementSets = remember { mutableSetOf<AdvertisementSet>() }
+    val pendingMultiAdvertisementSets = remember { mutableSetOf<AdvertisementSet>() }
+    val awaitingMultiCycleStart = remember { booleanArrayOf(false) }
 
     fun highlightActiveAdvertisementSets() {
         advertisementSetLists.forEach { advertisementList ->
@@ -81,7 +83,11 @@ fun AdvertisementRoute(
                     viewModel.advertisementSetTitle.value = advertisementSet.title
                     viewModel.advertisementSetSubTitle.value = advertisementSetSubtitle(advertisementSet)
                     if ((context.applicationContext as BleSpamApplication).queueHandler.getAdvertisementQueueMode() == AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI) {
-                        activeAdvertisementSets.add(advertisementSet)
+                        if (awaitingMultiCycleStart[0]) {
+                            pendingMultiAdvertisementSets.add(advertisementSet)
+                        } else {
+                            activeAdvertisementSets.add(advertisementSet)
+                        }
                         advertisementSet.advertisementState = AdvertisementState.ADVERTISEMENT_STATE_STARTED
                         highlightActiveAdvertisementSets()
                     } else {
@@ -92,10 +98,9 @@ fun AdvertisementRoute(
 
             override fun onAdvertisementSetStop(advertisementSet: AdvertisementSet?) {
                 Log.d(LOG_TAG, "onAdvertisementSetStop")
-                if (advertisementSet != null && (context.applicationContext as BleSpamApplication).queueHandler.getAdvertisementQueueMode() == AdvertisementQueueMode.ADVERTISEMENT_QUEUE_MODE_MULTI) {
-                    activeAdvertisementSets.remove(advertisementSet)
-                    highlightActiveAdvertisementSets()
-                }
+                // Multi Mode replaces the whole visible set atomically on the first
+                // start of the next cycle, so old-cycle stop callbacks do not need
+                // to mutate the list.
             }
 
             override fun onAdvertisementSetSucceeded(advertisementSet: AdvertisementSet?) {
@@ -123,13 +128,26 @@ fun AdvertisementRoute(
             override fun onQueueHandlerDeactivated() {
                 Log.d(LOG_TAG, "onQueueHandlerDeactivated")
                 viewModel.isAdvertising.value = false
+                awaitingMultiCycleStart[0] = false
+                pendingMultiAdvertisementSets.clear()
                 activeAdvertisementSets.clear()
                 highlightActiveAdvertisementSets()
             }
 
             override fun onMultiCycleStarted() {
-                activeAdvertisementSets.clear()
-                highlightActiveAdvertisementSets()
+                // Keep the previous rows visible while the next cycle starts arrive.
+                awaitingMultiCycleStart[0] = true
+                pendingMultiAdvertisementSets.clear()
+            }
+
+            override fun onMultiCycleReady() {
+                if (awaitingMultiCycleStart[0]) {
+                    activeAdvertisementSets.clear()
+                    activeAdvertisementSets.addAll(pendingMultiAdvertisementSets)
+                    pendingMultiAdvertisementSets.clear()
+                    awaitingMultiCycleStart[0] = false
+                    highlightActiveAdvertisementSets()
+                }
             }
 
             override fun onAdvertisementSetCollectionChanged() {

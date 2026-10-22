@@ -71,6 +71,7 @@ class AdvertisementSetQueueHandler(
     private val _multiAdvertisementServices = mutableListOf<MultiAdvertiser>()
     private val _multiListIndices = mutableMapOf<Int, Int>()
     private var _multiCycleToken = 0
+    private var _multiStartSpacingMillis = 0L
 
     init {
         _advertisementService.addAdvertisementServiceCallback(this)
@@ -101,6 +102,10 @@ class AdvertisementSetQueueHandler(
         if (milliseconds > 0) {
             _intervalMillis = milliseconds
         }
+    }
+
+    fun setMultiStartSpacing(milliseconds: Long) {
+        _multiStartSpacingMillis = milliseconds.coerceIn(0L, MAX_MULTI_START_SPACING_MILLIS)
     }
 
     fun setTxPowerLevel(txPowerLevel: TxPowerLevel) {
@@ -321,7 +326,14 @@ class AdvertisementSetQueueHandler(
             }
         }
 
-        if (selectedSets.isEmpty()) return
+        if (selectedSets.isEmpty()) {
+            _advertisementQueueHandlerCallbacks.forEach { callback ->
+                try { callback.onMultiCycleReady() } catch (e: Exception) {
+                    Log.e(_logTag, "Failed to call onMultiCycleReady: ${e.message}")
+                }
+            }
+            return
+        }
 
         selectedSets.forEachIndexed { index, set ->
             val service = BluetoothHelpers.getAdvertisementService(context)
@@ -363,8 +375,18 @@ class AdvertisementSetQueueHandler(
                 if (advertiser.cycleToken == _multiCycleToken && _active) {
                     startMultiAdvertiser(advertiser, set)
                 }
-            }, index * MULTI_START_STAGGER_MILLIS)
+            }, index * _multiStartSpacingMillis)
         }
+
+        _multiHandler.postDelayed({
+            if (_active && cycleToken == _multiCycleToken) {
+                _advertisementQueueHandlerCallbacks.forEach { callback ->
+                    try { callback.onMultiCycleReady() } catch (e: Exception) {
+                        Log.e(_logTag, "Failed to call onMultiCycleReady: ${e.message}")
+                    }
+                }
+            }
+        }, ((selectedSets.size - 1) * _multiStartSpacingMillis) + MULTI_STATUS_SETTLE_MILLIS)
 
         _multiHandler.postDelayed({
             if (_active &&
@@ -377,9 +399,10 @@ class AdvertisementSetQueueHandler(
     private val _multiHandler = Handler(Looper.getMainLooper())
 
     private companion object {
-        const val MULTI_START_STAGGER_MILLIS = 50L
+        const val MAX_MULTI_START_SPACING_MILLIS = 500L
         const val MULTI_RETRY_DELAY_MILLIS = 500L
         const val MULTI_MAX_START_ATTEMPTS = 5
+        const val MULTI_STATUS_SETTLE_MILLIS = 5L
     }
 
     private fun startMultiAdvertiser(

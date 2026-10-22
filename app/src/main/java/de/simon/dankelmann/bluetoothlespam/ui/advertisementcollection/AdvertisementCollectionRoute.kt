@@ -64,7 +64,9 @@ fun AdvertisementMultiModeRoute(
     val context = LocalContext.current
     MultiModeSetupScreen(
         onBack = onBack,
-        onStart = { types ->
+        onStart = { types, startSpacingMillis ->
+            (context.applicationContext as BleSpamApplication).queueHandler
+                .setMultiStartSpacing(startSpacingMillis)
             navigateToAdvertisementWithType(
                 context,
                 types,
