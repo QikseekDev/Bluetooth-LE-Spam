@@ -168,6 +168,10 @@ fun MultiModeSetupScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
+                        "Warning: Multi Mode can and will cause lag while it is running.",
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
                         "Advertise across platforms at the same time. For example, run an Android Fast Pair list alongside an Apple/iOS Continuity list.",
                         fontWeight = FontWeight.Bold,
                     )
